@@ -518,14 +518,14 @@ if diag.check_thermal_issues():
 ```bibtex
 @inproceedings{photonic_flash_attention2025,
   title={Photonic Flash-Attention: Optical Acceleration of Transformer Models},
-  author={Your Name et al.},
+  author={Daniel Schmidt},
   booktitle={NeurIPS},
   year={2025}
 }
 
 @article{hybrid_optical_computing2024,
   title={Hybrid Optical-Electronic Computing for Efficient Neural Networks},
-  author={Your Team},
+  author={Daniel Schmidt},
   journal={Nature Photonics},
   year={2024}
 }
