@@ -1,0 +1,246 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: photonic-flash-attention
+  namespace: photonic
+  labels:
+    app: photonic-flash-attention
+    version: v1.0.0
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: photonic-flash-attention
+  template:
+    metadata:
+      labels:
+        app: photonic-flash-attention
+        version: v1.0.0
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: photonic-attention
+        image: photonic-flash-attention:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8090
+          name: metrics
+        env:
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        - name: PHOTONIC_LOG_LEVEL
+          value: "INFO"
+        - name: PHOTONIC_LOG_JSON
+          value: "true"
+        - name: PHOTONIC_SIMULATION
+          valueFrom:
+            configMapKeyRef:
+              name: photonic-config
+              key: simulation_mode
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "1000m"
+            nvidia.com/gpu: 1
+          limits:
+            memory: "8Gi"
+            cpu: "4000m"
+            nvidia.com/gpu: 1
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: logs-volume
+          mountPath: /app/logs
+        - name: tmp-volume
+          mountPath: /tmp
+      volumes:
+      - name: config-volume
+        configMap:
+          name: photonic-config
+      - name: logs-volume
+        persistentVolumeClaim:
+          claimName: photonic-logs-pvc
+      - name: tmp-volume
+        emptyDir: {}
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: photonic-flash-attention-service
+  namespace: photonic
+  labels:
+    app: photonic-flash-attention
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8080
+    name: http
+  - port: 8090
+    targetPort: 8090
+    name: metrics
+  selector:
+    app: photonic-flash-attention
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: photonic-config
+  namespace: photonic
+data:
+  simulation_mode: "false"
+  log_level: "INFO"
+  max_batch_size: "128"
+  photonic_threshold: "512"
+  config.yaml: |
+    photonic:
+      wavelengths: 80
+      modulator_resolution: 6
+      max_optical_power: 0.01
+      temperature_limit: 85.0
+    
+    security:
+      enable_validation: true
+      max_tensor_size: 1073741824  # 1GB
+      allowed_dtypes: ["float32", "float16", "bfloat16"]
+    
+    performance:
+      enable_profiling: true
+      cache_size: 1000
+      memory_pool_size: 512  # MB
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: photonic-logs-pvc
+  namespace: photonic
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: photonic-flash-attention-ingress
+  namespace: photonic
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "60s"
+spec:
+  tls:
+  - hosts:
+    - photonic.example.com
+    secretName: photonic-tls-secret
+  rules:
+  - host: photonic.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: photonic-flash-attention-service
+            port:
+              number: 80
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: photonic-flash-attention-hpa
+  namespace: photonic
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: photonic-flash-attention
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: photonic-flash-attention-pdb
+  namespace: photonic
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: photonic-flash-attention
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: photonic-tls-secret
+  namespace: photonic
+type: kubernetes.io/tls
+data:
+  tls.crt: # Base64 encoded certificate
+  tls.key: # Base64 encoded private key
