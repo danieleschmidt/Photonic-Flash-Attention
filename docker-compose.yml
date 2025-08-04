@@ -1,0 +1,169 @@
+version: '3.8'
+
+services:
+  # Production service
+  photonic-attention:
+    build:
+      context: .
+      target: production
+    container_name: photonic-flash-attention
+    restart: unless-stopped
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - PHOTONIC_LOG_LEVEL=INFO
+      - PHOTONIC_LOG_JSON=true
+      - PHOTONIC_SIMULATION=false
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data:ro
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - photonic-net
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import photonic_flash_attention; print('OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development service
+  photonic-dev:
+    build:
+      context: .
+      target: development
+    container_name: photonic-dev
+    ports:
+      - "8888:8888"
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - PHOTONIC_LOG_LEVEL=DEBUG
+      - PHOTONIC_SIMULATION=true
+      - JUPYTER_ENABLE_LAB=yes
+    volumes:
+      - .:/app
+      - ./notebooks:/app/notebooks
+      - ./logs:/app/logs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - photonic-net
+
+  # Monitoring service
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: photonic-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - photonic-net
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: photonic-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - photonic-net
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    container_name: photonic-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - photonic-net
+
+  # Load balancer (nginx)
+  nginx:
+    image: nginx:alpine
+    container_name: photonic-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - photonic-attention
+    networks:
+      - photonic-net
+
+  # Testing service
+  photonic-test:
+    build:
+      context: .
+      target: testing
+    container_name: photonic-test
+    environment:
+      - PHOTONIC_SIMULATION=true
+    volumes:
+      - ./test-results:/app/test-results
+    networks:
+      - photonic-net
+    profiles:
+      - testing
+
+  # Benchmarking service
+  photonic-benchmark:
+    build:
+      context: .
+      target: benchmark
+    container_name: photonic-benchmark
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - PHOTONIC_SIMULATION=true
+    volumes:
+      - ./benchmark-results:/app/benchmark-results
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - photonic-net
+    profiles:
+      - benchmark
+
+networks:
+  photonic-net:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  redis-data:
