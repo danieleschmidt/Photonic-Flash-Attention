@@ -15,7 +15,7 @@ Re-implementation of Flash-Attention 3 with integrated silicon-photonic kernels 
 - **Energy Efficient**: Up to 10x lower power for long sequences
 - **Drop-in Compatible**: Works with existing transformer implementations
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 
@@ -31,6 +31,8 @@ git clone https://github.com/yourusername/Photonic-Flash-Attention.git
 cd Photonic-Flash-Attention
 pip install -e ".[dev,benchmark]"
 ```
+
+## Usage
 
 ### Basic Usage
 
@@ -57,6 +59,7 @@ output = attention(q, k, v)
 print(f"Computation device: {attention.last_device_used}")
 print(f"Latency: {attention.last_latency_ms:.2f} ms")
 print(f"Energy: {attention.last_energy_mj:.2f} mJ")
+```
 
 ### Transformer Integration
 
