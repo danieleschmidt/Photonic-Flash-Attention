@@ -8,7 +8,7 @@ import logging
 from typing import Optional, Tuple, Dict, Any, Union
 from ..config import get_config
 from ..photonic.hardware.detection import get_best_photonic_device, PhotonicDevice
-from ..photonic.optical_kernels.matrix_mult import OpticalMatrixMultiply
+from ..photonic.optical_kernels.matrix_mult import OpticalMatMul
 from ..photonic.optical_kernels.nonlinearity import OpticalSoftmax
 from ..utils.logging import get_logger
 from ..utils.validation import validate_tensor_shape, validate_attention_inputs
@@ -123,17 +123,21 @@ class PhotonicAttention(nn.Module):
             return
         
         try:
-            self.optical_matmul = OpticalMatrixMultiply(
-                device=self.photonic_device,
-                wavelengths=min(self.photonic_device.wavelengths, self.num_heads * 2),
-                precision=self.config.modulator_resolution,
-            )
+            from ..photonic.optical_kernels.matrix_mult import OpticalMatMulConfig
+            from ..photonic.optical_kernels.nonlinearity import OpticalNonlinearityConfig
             
-            self.optical_softmax = OpticalSoftmax(
-                device=self.photonic_device,
-                approximate=True,  # Use optical approximation for speed
-                precision=self.config.modulator_resolution,
+            # Create optical matrix multiply configuration
+            matmul_config = OpticalMatMulConfig(
+                n_wavelengths=min(self.photonic_device.wavelengths, self.num_heads * 2),
+                modulator_resolution=self.config.modulator_resolution,
             )
+            self.optical_matmul = OpticalMatMul(matmul_config)
+            
+            # Create optical softmax
+            softmax_config = OpticalNonlinearityConfig(
+                n_wavelengths=min(self.photonic_device.wavelengths, self.num_heads * 2),
+            )
+            self.optical_softmax = OpticalSoftmax(softmax_config)
             
             self.logger.info("Initialized optical kernels successfully")
             
@@ -320,16 +324,25 @@ class PhotonicAttention(nn.Module):
         # QKV projection using optical matrix multiplication
         if torch.equal(query, key) and torch.equal(query, value):
             # Self-attention: compute QKV in one operation
-            qkv = self.optical_matmul.forward(query, self.qkv_proj.weight.T, self.qkv_proj.bias)
+            qkv_weights = self.qkv_proj.weight.T  # [embed_dim, 3*embed_dim] -> [3*embed_dim, embed_dim]
+            qkv = self.optical_matmul.forward(query, qkv_weights)
+            if self.qkv_proj.bias is not None:
+                qkv = qkv + self.qkv_proj.bias
             q, k, v = qkv.chunk(3, dim=-1)
         else:
             # Cross-attention: separate projections
             q_weight, k_weight, v_weight = self.qkv_proj.weight.chunk(3, dim=0)
             q_bias, k_bias, v_bias = self.qkv_proj.bias.chunk(3, dim=0) if self.qkv_proj.bias is not None else (None, None, None)
             
-            q = self.optical_matmul.forward(query, q_weight.T, q_bias)
-            k = self.optical_matmul.forward(key, k_weight.T, k_bias)
-            v = self.optical_matmul.forward(value, v_weight.T, v_bias)
+            q = self.optical_matmul.forward(query, q_weight.T)
+            if q_bias is not None:
+                q = q + q_bias
+            k = self.optical_matmul.forward(key, k_weight.T)
+            if k_bias is not None:
+                k = k + k_bias
+            v = self.optical_matmul.forward(value, v_weight.T)
+            if v_bias is not None:
+                v = v + v_bias
         
         # Reshape for multi-head attention
         q = q.view(batch_size, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
@@ -349,7 +362,7 @@ class PhotonicAttention(nn.Module):
             attn_scores = attn_scores.masked_fill(attention_mask == 0, float('-inf'))
         
         # Optical softmax
-        attn_weights = self.optical_softmax.forward(attn_scores)
+        attn_weights = self.optical_softmax.forward(attn_scores, dim=-1)
         
         # Apply dropout
         if self.dropout_module is not None:
@@ -360,7 +373,9 @@ class PhotonicAttention(nn.Module):
         
         # Reshape and project
         attn_output = attn_output.transpose(1, 2).contiguous().view(batch_size, seq_len, self.embed_dim)
-        output = self.optical_matmul.forward(attn_output, self.out_proj.weight.T, self.out_proj.bias)
+        output = self.optical_matmul.forward(attn_output, self.out_proj.weight.T)
+        if self.out_proj.bias is not None:
+            output = output + self.out_proj.bias
         
         return output, attn_weights if need_weights else None
     
