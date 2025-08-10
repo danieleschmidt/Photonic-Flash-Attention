@@ -24,6 +24,10 @@ class PhotonicHardwareError(PhotonicFlashAttentionError):
         return " | ".join(parts)
 
 
+# Aliases for backward compatibility
+PhotonicComputeError = PhotonicFlashAttentionError
+HardwareNotAvailableError = PhotonicHardwareError
+
 class PhotonicComputationError(PhotonicFlashAttentionError):
     """Raised when photonic computation fails."""
     

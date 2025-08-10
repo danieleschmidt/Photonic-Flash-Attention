@@ -231,6 +231,59 @@ def validate_memory_usage(tensors: List[torch.Tensor], max_memory_gb: float = 16
         )
 
 
+def validate_optical_tensor(tensor: torch.Tensor, name: str = "tensor") -> None:
+    """
+    Validate tensor for optical computation.
+    
+    Args:
+        tensor: Tensor to validate
+        name: Name for error messages
+        
+    Raises:
+        PhotonicComputationError: If validation fails
+    """
+    check_tensor_finite(tensor, name)
+    
+    # Check data type
+    if tensor.dtype not in (torch.float16, torch.float32, torch.complex64, torch.complex128):
+        raise PhotonicComputationError(
+            f"{name} has unsupported dtype {tensor.dtype} for optical computation"
+        )
+    
+    # Check tensor size limits
+    max_elements = 100_000_000  # 100M elements
+    if tensor.numel() > max_elements:
+        raise PhotonicComputationError(
+            f"{name} too large: {tensor.numel()} elements > {max_elements}"
+        )
+
+
+def validate_matrix_dimensions(a: torch.Tensor, b: torch.Tensor) -> None:
+    """
+    Validate matrix multiplication dimensions.
+    
+    Args:
+        a: First matrix
+        b: Second matrix
+        
+    Raises:
+        PhotonicComputationError: If dimensions are incompatible
+    """
+    if a.dim() < 2 or b.dim() < 2:
+        raise PhotonicComputationError(
+            f"Matrices must be at least 2D: got {a.dim()}D and {b.dim()}D"
+        )
+    
+    # Check inner dimensions for matrix multiplication
+    a_inner = a.shape[-1]
+    b_inner = b.shape[-2]
+    
+    if a_inner != b_inner:
+        raise PhotonicComputationError(
+            f"Matrix inner dimensions don't match: {a_inner} != {b_inner}"
+        )
+
+
 def check_tensor_finite(tensor: torch.Tensor, name: str = "tensor") -> None:
     """
     Check that tensor contains only finite values.
@@ -303,3 +356,44 @@ def sanitize_tensor_input(tensor: torch.Tensor, clip_range: Optional[Tuple[float
         tensor = torch.clamp(tensor, clip_range[0], clip_range[1])
     
     return tensor
+
+
+def validate_model_structure(model: torch.nn.Module) -> None:
+    """
+    Validate model structure for photonic conversion.
+    
+    Args:
+        model: PyTorch model to validate
+        
+    Raises:
+        PhotonicComputationError: If model structure is invalid
+    """
+    if not isinstance(model, torch.nn.Module):
+        raise PhotonicComputationError("Model must be a PyTorch nn.Module")
+    
+    # Check if model has parameters
+    total_params = sum(p.numel() for p in model.parameters())
+    if total_params == 0:
+        raise PhotonicComputationError("Model has no trainable parameters")
+    
+    # Check model can be set to different modes
+    try:
+        model.eval()
+        model.train()
+    except Exception as e:
+        raise PhotonicComputationError(f"Model cannot switch between train/eval modes: {e}")
+    
+    # Check for attention patterns
+    attention_found = False
+    for name, module in model.named_modules():
+        module_name = name.lower()
+        class_name = type(module).__name__.lower()
+        if any(pattern in module_name or pattern in class_name 
+               for pattern in ['attention', 'attn', 'multihead']):
+            attention_found = True
+            break
+    
+    if not attention_found:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning("No attention layers detected in model - photonic conversion may have no effect")
