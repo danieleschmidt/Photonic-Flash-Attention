@@ -1,0 +1,180 @@
+{
+  "environment": "production",
+  "version": "1.0.0",
+  
+  "photonic_config": {
+    "auto_device_selection": true,
+    "photonic_threshold": 512,
+    "max_optical_power": 10e-3,
+    "wavelengths": 80,
+    "modulator_resolution": 8,
+    "thermal_safety_margin": 10.0,
+    "calibration_interval": 3600,
+    "hardware_timeout": 30.0
+  },
+  
+  "performance_config": {
+    "enable_caching": true,
+    "cache_size_mb": 2048,
+    "enable_batching": true,
+    "max_batch_size": 64,
+    "batch_timeout_ms": 50.0,
+    "enable_prefetching": true,
+    "prefetch_queue_size": 32,
+    "enable_parallelization": true,
+    "max_workers": 8,
+    "enable_autotuning": true,
+    "autotuning_samples": 500,
+    "performance_cache_file": "/app/cache/performance_cache.json"
+  },
+  
+  "load_balancer_config": {
+    "strategy": "performance_based",
+    "health_check_interval": 30.0,
+    "max_retries": 3,
+    "retry_delay": 1.0,
+    "request_timeout": 60.0,
+    "enable_circuit_breaker": true,
+    "circuit_breaker_threshold": 5,
+    "circuit_breaker_timeout": 120.0,
+    "enable_sticky_sessions": false,
+    "enable_auto_scaling": true,
+    "scale_up_threshold": 0.75,
+    "scale_down_threshold": 0.25,
+    "min_nodes": 2,
+    "max_nodes": 16
+  },
+  
+  "security_config": {
+    "max_tensor_size": 2147483648,
+    "max_sequence_length": 32768,
+    "max_batch_size": 256,
+    "enable_input_validation": true,
+    "enable_output_sanitization": true,
+    "allowed_dtypes": ["float32", "float16", "bfloat16"],
+    "blocked_paths": ["/proc", "/sys", "/dev", "/etc", "/root"],
+    "enable_audit_logging": true,
+    "session_timeout": 7200,
+    "max_login_attempts": 5
+  },
+  
+  "monitoring_config": {
+    "enable_health_monitoring": true,
+    "health_check_interval": 15.0,
+    "enable_performance_metrics": true,
+    "metrics_collection_interval": 10.0,
+    "enable_distributed_tracing": true,
+    "trace_sample_rate": 0.1,
+    "alert_thresholds": {
+      "cpu_usage": 85.0,
+      "memory_usage": 90.0,
+      "gpu_usage": 95.0,
+      "temperature": 80.0,
+      "latency_p95_ms": 1000.0,
+      "error_rate": 0.01
+    }
+  },
+  
+  "logging_config": {
+    "level": "INFO",
+    "json_format": true,
+    "log_file": "/app/logs/photonic.log",
+    "max_file_size": 104857600,
+    "backup_count": 10,
+    "enable_structured_logging": true,
+    "enable_correlation_ids": true,
+    "sensitive_fields": ["password", "token", "key", "secret"],
+    "log_retention_days": 30
+  },
+  
+  "storage_config": {
+    "model_cache_dir": "/app/cache/models",
+    "data_cache_dir": "/app/cache/data",
+    "temp_dir": "/app/tmp",
+    "checkpoint_dir": "/app/checkpoints",
+    "max_cache_size_gb": 50,
+    "cache_cleanup_interval": 86400,
+    "enable_compression": true,
+    "compression_level": 6
+  },
+  
+  "network_config": {
+    "server_host": "0.0.0.0",
+    "server_port": 8080,
+    "metrics_port": 9090,
+    "max_connections": 1000,
+    "connection_timeout": 300,
+    "keep_alive_timeout": 30,
+    "enable_cors": false,
+    "allowed_origins": [],
+    "enable_rate_limiting": true,
+    "rate_limit_requests": 100,
+    "rate_limit_window": 60
+  },
+  
+  "database_config": {
+    "enable_persistence": true,
+    "backend": "lmdb",
+    "connection_string": "/app/data/photonic.db",
+    "max_connections": 20,
+    "connection_timeout": 30,
+    "query_timeout": 60,
+    "enable_transactions": true,
+    "backup_interval": 86400,
+    "backup_retention": 7
+  },
+  
+  "deployment_config": {
+    "deployment_mode": "kubernetes",
+    "replica_count": 3,
+    "resource_requests": {
+      "cpu": "2",
+      "memory": "8Gi",
+      "nvidia.com/gpu": "1"
+    },
+    "resource_limits": {
+      "cpu": "4",
+      "memory": "16Gi",
+      "nvidia.com/gpu": "1"
+    },
+    "rolling_update": {
+      "max_unavailable": 1,
+      "max_surge": 1
+    },
+    "readiness_probe": {
+      "initial_delay": 30,
+      "period": 10,
+      "timeout": 5,
+      "failure_threshold": 3
+    },
+    "liveness_probe": {
+      "initial_delay": 60,
+      "period": 30,
+      "timeout": 10,
+      "failure_threshold": 3
+    }
+  },
+  
+  "integration_config": {
+    "pytorch_backend": "cuda",
+    "mixed_precision": true,
+    "gradient_checkpointing": true,
+    "compile_model": true,
+    "enable_torch_script": false,
+    "enable_onnx_export": true,
+    "dynamic_batching": true,
+    "tensor_parallelism": false,
+    "pipeline_parallelism": false
+  },
+  
+  "experimental_config": {
+    "enable_quantization": false,
+    "quantization_bits": 8,
+    "enable_pruning": false,
+    "pruning_sparsity": 0.1,
+    "enable_distillation": false,
+    "enable_early_stopping": true,
+    "patience": 10,
+    "enable_adaptive_optimization": true
+  }
+}
