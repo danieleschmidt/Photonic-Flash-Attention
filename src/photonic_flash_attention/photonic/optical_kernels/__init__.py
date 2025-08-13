@@ -1,12 +1,10 @@
 """Optical computing kernels for photonic attention."""
 
-from .matrix_mult import OpticalMatrixMultiply
-from .nonlinearity import OpticalSoftmax, OpticalActivation
-from .interconnect import PhotonicInterconnect
+from .matrix_mult import OpticalMatMul
+from .nonlinearity import OpticalSoftmax, OpticalActivations
 
 __all__ = [
-    "OpticalMatrixMultiply",
+    "OpticalMatMul",
     "OpticalSoftmax",
-    "OpticalActivation", 
-    "PhotonicInterconnect",
+    "OpticalActivations",
 ]
