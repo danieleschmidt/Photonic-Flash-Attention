@@ -58,22 +58,9 @@ class PhotonicAttention(nn.Module):
         # Configuration
         self.config = get_config()
         
-        # Hardware detection and validation
-        self.photonic_device = None
-        self.device_validated = False
-        self._initialize_photonic_hardware()
-        
-        # Neural network layers
-        self.qkv_proj = nn.Linear(embed_dim, 3 * embed_dim, bias=bias, device=device, dtype=dtype)
-        self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias, device=device, dtype=dtype)
-        
-        # Dropout
-        self.dropout_module = nn.Dropout(dropout) if dropout > 0 else None
-        
-        # Photonic kernels
-        self.optical_matmul = None
-        self.optical_softmax = None
-        self._initialize_optical_kernels()
+        # Thermal protection (set before hardware initialization)
+        self.thermal_shutdown_temp = self.config.thermal_shutdown_temp
+        self.thermal_warning_temp = self.thermal_shutdown_temp - 10.0
         
         # Performance and safety tracking
         self.last_latency_ms = 0.0
@@ -83,9 +70,25 @@ class PhotonicAttention(nn.Module):
         self.max_failures = 3
         self.is_degraded = False
         
-        # Thermal protection
-        self.thermal_shutdown_temp = self.config.thermal_shutdown_temp
-        self.thermal_warning_temp = self.thermal_shutdown_temp - 10.0
+        # Hardware detection and validation
+        self.photonic_device = None
+        self.device_validated = False
+        self._initialize_photonic_hardware()
+        
+        # Handle device specification
+        actual_device = None if device == 'auto' else device
+        
+        # Neural network layers
+        self.qkv_proj = nn.Linear(embed_dim, 3 * embed_dim, bias=bias, device=actual_device, dtype=dtype)
+        self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias, device=actual_device, dtype=dtype)
+        
+        # Dropout
+        self.dropout_module = nn.Dropout(dropout) if dropout > 0 else None
+        
+        # Photonic kernels
+        self.optical_matmul = None
+        self.optical_softmax = None
+        self._initialize_optical_kernels()
         
         self.logger.info(f"Initialized PhotonicAttention: {embed_dim}d, {num_heads} heads, device={self.photonic_device.device_id if self.photonic_device else 'None'}")
     
