@@ -1,0 +1,33 @@
+# Development dependencies for Photonic Flash Attention
+pytest>=7.0.0
+pytest-cov>=3.0.0
+pytest-xdist>=2.5.0
+pytest-mock>=3.6.0
+pytest-benchmark>=4.0.0
+
+# Code quality
+black>=22.0.0
+isort>=5.10.0
+flake8>=4.0.0
+mypy>=0.950
+pylint>=2.12.0
+
+# Documentation
+sphinx>=4.5.0
+sphinx-rtd-theme>=1.0.0
+sphinx-autodoc-typehints>=1.17.0
+
+# Development tools
+ipython>=8.0.0
+jupyter>=1.0.0
+notebook>=6.4.0
+
+# Profiling and debugging
+memory-profiler>=0.60.0
+line-profiler>=3.5.0
+py-spy>=0.3.0
+
+# Testing utilities
+hypothesis>=6.0.0
+factory-boy>=3.2.0
+responses>=0.20.0

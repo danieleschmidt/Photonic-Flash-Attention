@@ -1,4 +1,9 @@
-"""Input validation and sanitization utilities."""
+"""
+Comprehensive input/output validation and sanitization for photonic attention.
+
+This module provides robust validation, sanitization, and security checks
+for all data flowing through the photonic attention system.
+"""
 
 import torch
 import numpy as np
@@ -397,3 +402,275 @@ def validate_model_structure(model: torch.nn.Module) -> None:
         import logging
         logger = logging.getLogger(__name__)
         logger.warning("No attention layers detected in model - photonic conversion may have no effect")
+
+
+def validate_device_compatibility(tensor: torch.Tensor, target_device: str) -> None:
+    """
+    Validate tensor device compatibility for photonic operations.
+    
+    Args:
+        tensor: Tensor to check
+        target_device: Target device ('cuda', 'cpu', 'photonic')
+        
+    Raises:
+        PhotonicComputationError: If device is incompatible
+    """
+    current_device = str(tensor.device)
+    
+    # Check CUDA compatibility for photonic operations
+    if target_device == 'photonic' and not current_device.startswith('cuda'):
+        raise PhotonicComputationError(
+            f"Photonic operations require CUDA tensors, got {current_device}"
+        )
+    
+    # Check tensor is contiguous
+    if not tensor.is_contiguous():
+        raise PhotonicComputationError("Tensor must be contiguous for photonic operations")
+
+
+def validate_numerical_stability(
+    tensor: torch.Tensor, 
+    operation: str,
+    epsilon: float = 1e-8
+) -> None:
+    """
+    Validate numerical stability for photonic operations.
+    
+    Args:
+        tensor: Tensor to check
+        operation: Operation name for context
+        epsilon: Minimum value for stability checks
+        
+    Raises:
+        PhotonicComputationError: If numerical issues detected
+    """
+    # Check for very small values that could cause instability
+    if operation in ['division', 'softmax', 'log']:
+        if (tensor.abs() < epsilon).any():
+            raise PhotonicComputationError(
+                f"Tensor contains values too small for {operation}: min={tensor.abs().min():.2e}"
+            )
+    
+    # Check gradient flow for training
+    if tensor.requires_grad and operation in ['forward_pass']:
+        if tensor.grad is not None and torch.isnan(tensor.grad).any():
+            raise PhotonicComputationError(f"Gradient contains NaN values in {operation}")
+
+
+def validate_optical_power_budget(
+    tensor: torch.Tensor, 
+    max_power: float = 10e-3,  # 10mW
+    name: str = "tensor"
+) -> None:
+    """
+    Validate optical power budget for photonic operations.
+    
+    Args:
+        tensor: Tensor representing optical signals
+        max_power: Maximum allowed optical power in Watts
+        name: Tensor name for error messages
+        
+    Raises:
+        PhotonicComputationError: If power budget exceeded
+    """
+    # Estimate optical power as sum of absolute values
+    power_estimate = tensor.abs().sum().item() / tensor.numel()
+    
+    if power_estimate > max_power:
+        raise PhotonicComputationError(
+            f"{name} exceeds optical power budget: {power_estimate:.2e}W > {max_power:.2e}W"
+        )
+
+
+def validate_wavelength_allocation(
+    required_channels: int, 
+    available_channels: int,
+    operation: str = "optical_operation"
+) -> None:
+    """
+    Validate wavelength channel allocation.
+    
+    Args:
+        required_channels: Number of channels needed
+        available_channels: Number of channels available
+        operation: Operation name for context
+        
+    Raises:
+        PhotonicComputationError: If insufficient channels
+    """
+    if required_channels > available_channels:
+        raise PhotonicComputationError(
+            f"{operation} requires {required_channels} wavelength channels, "
+            f"only {available_channels} available"
+        )
+    
+    if required_channels <= 0:
+        raise PhotonicComputationError(f"Invalid channel requirement: {required_channels}")
+
+
+def validate_thermal_conditions(
+    temperature: float,
+    max_temp: float = 85.0,
+    min_temp: float = -40.0,
+    component: str = "photonic_device"
+) -> None:
+    """
+    Validate thermal operating conditions.
+    
+    Args:
+        temperature: Current temperature in Celsius
+        max_temp: Maximum safe temperature
+        min_temp: Minimum safe temperature
+        component: Component name for error messages
+        
+    Raises:
+        PhotonicComputationError: If temperature out of range
+    """
+    if temperature > max_temp:
+        raise PhotonicComputationError(
+            f"{component} temperature {temperature:.1f}°C exceeds maximum {max_temp:.1f}°C"
+        )
+    
+    if temperature < min_temp:
+        raise PhotonicComputationError(
+            f"{component} temperature {temperature:.1f}°C below minimum {min_temp:.1f}°C"
+        )
+
+
+def sanitize_config_dict(config: dict, allowed_keys: List[str]) -> dict:
+    """
+    Sanitize configuration dictionary by removing unknown keys.
+    
+    Args:
+        config: Configuration dictionary
+        allowed_keys: List of allowed configuration keys
+        
+    Returns:
+        Sanitized configuration dictionary
+    """
+    sanitized = {}
+    
+    for key, value in config.items():
+        if key in allowed_keys:
+            sanitized[key] = value
+        else:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Ignoring unknown configuration key: {key}")
+    
+    return sanitized
+
+
+def validate_attention_pattern(
+    attention_weights: torch.Tensor,
+    mask: Optional[torch.Tensor] = None,
+    tolerance: float = 1e-3
+) -> None:
+    """
+    Validate attention weight patterns for correctness.
+    
+    Args:
+        attention_weights: Attention weight matrix
+        mask: Optional attention mask
+        tolerance: Tolerance for sum-to-one check
+        
+    Raises:
+        PhotonicComputationError: If attention pattern is invalid
+    """
+    # Check dimensions
+    if attention_weights.dim() < 2:
+        raise PhotonicComputationError(
+            f"Attention weights must be at least 2D, got {attention_weights.dim()}D"
+        )
+    
+    # Check for negative weights
+    if (attention_weights < 0).any():
+        raise PhotonicComputationError("Attention weights cannot be negative")
+    
+    # Check sum-to-one property (last dimension)
+    if mask is not None:
+        # Apply mask before checking sums
+        masked_weights = attention_weights.masked_fill(mask == 0, 0.0)
+        weight_sums = masked_weights.sum(dim=-1)
+    else:
+        weight_sums = attention_weights.sum(dim=-1)
+    
+    # Allow for small numerical errors
+    target_sum = 1.0
+    if not torch.allclose(weight_sums, torch.ones_like(weight_sums) * target_sum, atol=tolerance):
+        max_error = (weight_sums - target_sum).abs().max().item()
+        raise PhotonicComputationError(
+            f"Attention weights don't sum to 1.0, max error: {max_error:.6f}"
+        )
+
+
+def validate_quantum_coherence(
+    optical_state: torch.Tensor,
+    coherence_threshold: float = 0.8,
+    name: str = "optical_state"
+) -> None:
+    """
+    Validate quantum coherence properties of optical states.
+    
+    Args:
+        optical_state: Complex-valued optical state tensor
+        coherence_threshold: Minimum coherence required (0-1)
+        name: State name for error messages
+        
+    Raises:
+        PhotonicComputationError: If coherence is insufficient
+    """
+    if not torch.is_complex(optical_state):
+        raise PhotonicComputationError(f"{name} must be complex-valued for coherence validation")
+    
+    # Calculate coherence as normalized correlation
+    amplitude = optical_state.abs()
+    phase = optical_state.angle()
+    
+    # Measure phase coherence across spatial/temporal dimensions
+    if optical_state.numel() > 1:
+        phase_variance = phase.var().item()
+        coherence = torch.exp(-phase_variance).item()
+        
+        if coherence < coherence_threshold:
+            raise PhotonicComputationError(
+                f"{name} coherence {coherence:.3f} below threshold {coherence_threshold:.3f}"
+            )
+
+
+def validate_modulation_depth(
+    modulated_signal: torch.Tensor,
+    min_depth: float = 0.1,
+    max_depth: float = 1.0,
+    name: str = "modulated_signal"
+) -> None:
+    """
+    Validate optical modulation depth.
+    
+    Args:
+        modulated_signal: Modulated optical signal
+        min_depth: Minimum acceptable modulation depth
+        max_depth: Maximum acceptable modulation depth  
+        name: Signal name for error messages
+        
+    Raises:
+        PhotonicComputationError: If modulation depth is invalid
+    """
+    # Calculate modulation depth as (max - min) / (max + min)
+    signal_max = modulated_signal.max().item()
+    signal_min = modulated_signal.min().item()
+    
+    if signal_max == signal_min:
+        modulation_depth = 0.0
+    else:
+        modulation_depth = (signal_max - signal_min) / (signal_max + signal_min)
+    
+    if modulation_depth < min_depth:
+        raise PhotonicComputationError(
+            f"{name} modulation depth {modulation_depth:.3f} below minimum {min_depth:.3f}"
+        )
+    
+    if modulation_depth > max_depth:
+        raise PhotonicComputationError(
+            f"{name} modulation depth {modulation_depth:.3f} above maximum {max_depth:.3f}"
+        )

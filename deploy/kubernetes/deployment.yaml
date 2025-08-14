@@ -1,0 +1,243 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: photonic-flash-attention
+  namespace: photonic-system
+  labels:
+    app: photonic-flash-attention
+    version: v1.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: photonic-flash-attention
+  template:
+    metadata:
+      labels:
+        app: photonic-flash-attention
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: photonic-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: photonic-flash-attention
+        image: photonic-flash-attention:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: grpc
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: PHOTONIC_LOG_LEVEL
+          value: "INFO"
+        - name: PHOTONIC_MAX_MEMORY
+          value: "8Gi"
+        - name: PHOTONIC_SIMULATION
+          value: "false"
+        - name: PYTHONPATH
+          value: "/app/src"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+            nvidia.com/gpu: 0
+          limits:
+            cpu: 2000m
+            memory: 8Gi
+            nvidia.com/gpu: 1
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+          readOnly: true
+        - name: cache-volume
+          mountPath: /app/cache
+        - name: logs-volume
+          mountPath: /app/logs
+      volumes:
+      - name: config-volume
+        configMap:
+          name: photonic-config
+      - name: cache-volume
+        emptyDir:
+          sizeLimit: 10Gi
+      - name: logs-volume
+        emptyDir:
+          sizeLimit: 5Gi
+      nodeSelector:
+        accelerator: photonic
+      tolerations:
+      - key: "photonic-node"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - photonic-flash-attention
+              topologyKey: kubernetes.io/hostname
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: photonic-flash-attention-service
+  namespace: photonic-system
+  labels:
+    app: photonic-flash-attention
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  - name: grpc
+    port: 9090
+    targetPort: grpc
+    protocol: TCP
+  selector:
+    app: photonic-flash-attention
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: photonic-config
+  namespace: photonic-system
+data:
+  photonic.yaml: |
+    # Photonic Flash Attention Configuration
+    photonic:
+      threshold: 1000
+      wavelengths: 80
+      max_optical_power: 0.01  # 10mW
+      enable_simulation: false
+      
+    performance:
+      cache_size_mb: 2048
+      memory_pool_size: 1024
+      batch_timeout_ms: 100
+      
+    security:
+      enable_validation: true
+      max_tensor_size_mb: 1024
+      allow_unsafe_operations: false
+      
+    monitoring:
+      enable_metrics: true
+      metrics_port: 8080
+      log_level: INFO
+      health_check_interval: 30
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: photonic-service-account
+  namespace: photonic-system
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: photonic-cluster-role
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: photonic-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: photonic-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: photonic-service-account
+  namespace: photonic-system
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: photonic-hpa
+  namespace: photonic-system
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: photonic-flash-attention
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
