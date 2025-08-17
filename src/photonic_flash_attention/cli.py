@@ -12,7 +12,7 @@ import numpy as np
 
 from . import get_device_info, get_version
 from .core.hybrid_router import HybridFlashAttention
-from .photonic.hardware.detection import list_photonic_devices, refresh_device_cache
+from .photonic.hardware.detection import get_photonic_devices, get_device_info as get_photonic_device_info
 from .utils.logging import setup_logging, get_logger
 from .config import get_config
 
@@ -168,9 +168,8 @@ def calibrate(args=None):
     
     logger.info("Starting photonic hardware calibration")
     
-    # Refresh device cache
-    refresh_device_cache()
-    devices = list_photonic_devices()
+    # Get photonic devices
+    devices = get_photonic_devices()
     
     if not devices:
         logger.error("No photonic devices found")
@@ -180,7 +179,7 @@ def calibrate(args=None):
     
     # Filter devices if specific ID requested
     if args.device_id:
-        devices = [d for d in devices if d['id'] == args.device_id]
+        devices = [d for d in devices if d.device_id == args.device_id]
         if not devices:
             logger.error(f"Device {args.device_id} not found")
             return False
@@ -188,7 +187,7 @@ def calibrate(args=None):
     calibration_results = {}
     
     for device_info in devices:
-        device_id = device_info['id']
+        device_id = device_info.device_id
         logger.info(f"Calibrating device: {device_id}")
         
         try:
@@ -238,20 +237,18 @@ def calibrate(args=None):
 
 
 def _perform_device_calibration(
-    device_info: Dict[str, Any], 
+    device_info: Any, 
     num_patterns: int,
     logger
 ) -> Dict[str, Any]:
     """Perform calibration for a single device."""
-    from .photonic.optical_kernels.matrix_mult import OpticalMatrixMultiply
+    from .photonic.optical_kernels.matrix_mult import OpticalMatMul
     
     # Create optical matrix multiply kernel for this device
     # Note: In a real implementation, this would interface with actual hardware
-    optical_kernel = OpticalMatrixMultiply(
-        device=None,  # Would pass actual device object
-        wavelengths=device_info.get('wavelengths', 64),
-        precision=6,
-    )
+    optical_kernel = OpticalMatMul()
+    
+    wavelengths = device_info.wavelengths if hasattr(device_info, 'wavelengths') else 64
     
     # Generate test patterns
     patterns = []
@@ -260,14 +257,14 @@ def _perform_device_calibration(
     
     for i in range(num_patterns):
         # Create random test pattern
-        size = min(64, device_info.get('wavelengths', 64))
+        size = min(64, wavelengths)
         A = torch.randn(size, size) * 0.5  # Keep values reasonable
         B = torch.randn(size, size) * 0.5
         
         # Measure response
         start_time = time.perf_counter()
         try:
-            result = optical_kernel(A, B)
+            result = optical_kernel.forward(A, B)
             end_time = time.perf_counter()
             
             latency = (end_time - start_time) * 1000
@@ -316,18 +313,30 @@ def device_info(args=None):
                           help='Refresh device cache')
         args = parser.parse_args()
     
-    if args.refresh:
-        refresh_device_cache()
-    
     # Get device information
     info = get_device_info()
-    devices = list_photonic_devices()
+    devices = get_photonic_devices()
     
     if args.json:
+        # Convert devices to serializable format
+        device_list = []
+        for device in devices:
+            device_list.append({
+                'id': device.device_id,
+                'type': device.device_type,
+                'vendor': device.vendor,
+                'model': device.model,
+                'wavelengths': device.wavelengths,
+                'max_power_mw': device.max_optical_power * 1000,
+                'temperature_c': device.temperature,
+                'available': device.is_available,
+                'driver_version': device.driver_version,
+            })
+        
         output = {
             'version': get_version(),
             'system_info': info,
-            'devices': devices,
+            'devices': device_list,
         }
         print(json.dumps(output, indent=2))
     else:
@@ -342,12 +351,12 @@ def device_info(args=None):
         print(f"\nPhotonic devices: {len(devices)}")
         if devices:
             for device in devices:
-                print(f"  {device['id']}: {device['vendor']} {device['type']}")
-                print(f"    Wavelengths: {device['wavelengths']}")
-                print(f"    Max power: {device['max_power_mw']:.1f} mW")
-                if device['temperature_c']:
-                    print(f"    Temperature: {device['temperature_c']:.1f}°C")
-                print(f"    Available: {device['available']}")
+                print(f"  {device.device_id}: {device.vendor} {device.device_type}")
+                print(f"    Wavelengths: {device.wavelengths}")
+                print(f"    Max power: {device.max_optical_power * 1000:.1f} mW")
+                if device.temperature:
+                    print(f"    Temperature: {device.temperature:.1f}°C")
+                print(f"    Available: {device.is_available}")
                 print()
         else:
             print("  No photonic devices detected")

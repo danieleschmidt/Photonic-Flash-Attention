@@ -5,14 +5,21 @@ This module provides robust validation, sanitization, and security checks
 for all data flowing through the photonic attention system.
 """
 
-import torch
 import numpy as np
 from typing import Optional, Tuple, Union, List
 from .exceptions import PhotonicConfigurationError, PhotonicComputationError
 
+# Import torch conditionally
+try:
+    import torch
+    _TORCH_AVAILABLE = True
+except ImportError:
+    _TORCH_AVAILABLE = False
+    torch = None
+
 
 def validate_tensor_shape(
-    tensor: torch.Tensor,
+    tensor,
     expected_dims: int,
     expected_shape: Optional[Tuple[int, ...]] = None,
     name: str = "tensor"
@@ -29,6 +36,9 @@ def validate_tensor_shape(
     Raises:
         PhotonicComputationError: If validation fails
     """
+    if not _TORCH_AVAILABLE:
+        raise PhotonicComputationError("PyTorch is required for tensor validation")
+        
     if not isinstance(tensor, torch.Tensor):
         raise PhotonicComputationError(f"{name} must be a torch.Tensor, got {type(tensor)}")
     

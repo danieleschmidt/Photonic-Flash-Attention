@@ -6,11 +6,22 @@ automatically switches between optical and electronic computation based on
 sequence length and hardware availability.
 """
 
-from .core.flash_attention_3 import FlashAttention3
-from .core.photonic_attention import PhotonicAttention
-from .core.hybrid_router import HybridFlashAttention
-from .integration.pytorch.modules import PhotonicFlashAttention
-from .integration.pytorch.convert import convert_to_photonic
+# Core imports that require PyTorch - import conditionally
+try:
+    from .core.flash_attention_3 import FlashAttention3
+    from .core.photonic_attention import PhotonicAttention
+    from .core.hybrid_router import HybridFlashAttention
+    from .integration.pytorch.modules import PhotonicFlashAttention
+    from .integration.pytorch.convert import convert_to_photonic
+    _TORCH_AVAILABLE = True
+except ImportError:
+    _TORCH_AVAILABLE = False
+    # Define placeholder classes/functions for when PyTorch is not available
+    FlashAttention3 = None
+    PhotonicAttention = None
+    HybridFlashAttention = None
+    PhotonicFlashAttention = None
+    convert_to_photonic = None
 
 __version__ = "0.1.0"
 __author__ = "Daniel Schmidt"
@@ -32,19 +43,25 @@ def get_version() -> str:
 
 def get_device_info() -> dict:
     """Get information about available computation devices."""
-    import torch
     from .photonic.hardware.detection import detect_photonic_hardware
     
     info = {
-        "cuda_available": torch.cuda.is_available(),
-        "cuda_device_count": torch.cuda.device_count() if torch.cuda.is_available() else 0,
         "photonic_available": detect_photonic_hardware(),
         "version": __version__,
     }
     
-    if torch.cuda.is_available():
-        info["cuda_version"] = torch.version.cuda
-        info["gpu_names"] = [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]
+    # Add CUDA info if PyTorch is available
+    if _TORCH_AVAILABLE:
+        import torch
+        info["cuda_available"] = torch.cuda.is_available()
+        info["cuda_device_count"] = torch.cuda.device_count() if torch.cuda.is_available() else 0
+        
+        if torch.cuda.is_available():
+            info["cuda_version"] = torch.version.cuda
+            info["gpu_names"] = [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]
+    else:
+        info["cuda_available"] = False
+        info["cuda_device_count"] = 0
     
     return info
 
