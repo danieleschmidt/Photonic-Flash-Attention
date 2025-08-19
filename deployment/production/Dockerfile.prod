@@ -1,0 +1,124 @@
+# Multi-stage production Dockerfile for Photonic Flash Attention
+FROM python:3.11-slim as base
+
+# Build arguments
+ARG BUILDKIT_INLINE_CACHE=1
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Metadata
+LABEL maintainer="Terragon Labs <contact@terragonlabs.ai>"
+LABEL description="Production-ready Photonic Flash Attention system"
+LABEL version="1.0.0"
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    curl \
+    git \
+    libfftw3-dev \
+    libopenblas-dev \
+    liblapack-dev \
+    pkg-config \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python environment
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Create non-root user
+RUN groupadd -r photonic && useradd -r -g photonic photonic
+
+# Working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements-prod.txt requirements.txt ./
+COPY pyproject.toml setup.py ./
+
+# Install Python dependencies
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install -r requirements-prod.txt && \
+    pip install -e . --no-deps
+
+# Copy source code
+COPY src/ ./src/
+COPY deployment/ ./deployment/
+COPY scripts/ ./scripts/
+
+# Create necessary directories
+RUN mkdir -p /app/data /app/logs /app/models /app/cache && \
+    chown -R photonic:photonic /app
+
+# Production-specific optimizations
+RUN python -m compileall src/ && \
+    python -c "import torch; import photonic_flash_attention" && \
+    rm -rf /tmp/* /var/tmp/*
+
+# Security hardening
+RUN find /app -type f -exec chmod 644 {} + && \
+    find /app -type d -exec chmod 755 {} + && \
+    chmod +x /app/scripts/*.sh
+
+# Health check script
+COPY --chown=photonic:photonic deployment/production/healthcheck.py /app/healthcheck.py
+RUN chmod +x /app/healthcheck.py
+
+# Switch to non-root user
+USER photonic
+
+# Environment configuration
+ENV PYTHONPATH=/app/src \
+    PHOTONIC_MODE=production \
+    LOG_LEVEL=INFO \
+    THERMAL_MONITORING=true \
+    ENERGY_OPTIMIZATION=true
+
+# Expose monitoring port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python /app/healthcheck.py
+
+# Default command
+CMD ["python", "-m", "photonic_flash_attention.cli", "--mode", "production"]
+
+
+# Development stage (for testing)
+FROM base as development
+
+# Install development dependencies
+COPY requirements-dev.txt ./
+RUN pip install -r requirements-dev.txt
+
+# Switch back to root for development tools
+USER root
+
+# Install additional dev tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gdb \
+    strace \
+    ltrace \
+    valgrind \
+    && rm -rf /var/lib/apt/lists/*
+
+# Switch back to photonic user
+USER photonic
+
+# Override default command for development
+CMD ["python", "-m", "photonic_flash_attention.cli", "--mode", "development"]
+
+
+# Production stage (default)
+FROM base as production
+
+# Final production setup
+ENV NODE_ENV=production
+ENV PHOTONIC_PRODUCTION=true
+
+# Final security check
+RUN python -c "import photonic_flash_attention; print('Production build successful')"
