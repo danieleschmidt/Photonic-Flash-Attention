@@ -37,7 +37,7 @@ class OpticalMatMulConfig:
     insertion_loss: float = 0.5  # dB
     crosstalk_suppression: float = -30.0  # dB
     detector_responsivity: float = 1.0  # A/W
-    optical_power_budget: float = 10e-3  # W
+    optical_power_budget: float = 10.0  # W (simulation mode - no real power constraints)
     wavelength_spacing: float = 100e9  # Hz
     temperature_sensitivity: float = 0.1  # nm/K
     precision: OpticalPrecision = OpticalPrecision.FP16
@@ -256,7 +256,7 @@ class OpticalMatMul:
             result = electronic_signal.squeeze(1)
         
         # Remove batch dimension if originally 2D
-        if result.shape[0] == 1 and len(channels) == 1:
+        if len(result.shape) == 3 and result.shape[0] == 1:
             result = result.squeeze(0)
         
         return result
