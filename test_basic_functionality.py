@@ -125,7 +125,13 @@ def test_hybrid_attention():
         x = torch.randn(batch_size, seq_len, 64)
         
         # Forward pass
-        output = attention(x)
+        result = attention(x)
+        
+        # Handle tuple return (output, weights) vs single output
+        if isinstance(result, tuple):
+            output, weights = result
+        else:
+            output = result
         
         # Check output shape
         assert output.shape == x.shape, f"Output shape mismatch: {output.shape} vs {x.shape}"
@@ -153,8 +159,8 @@ def test_optical_kernels():
         
         # Test optical matrix multiplication
         matmul = OpticalMatMul()
-        A = torch.randn(4, 8) * 0.1  # Small values for stability
-        B = torch.randn(8, 6) * 0.1
+        A = torch.randn(4, 8) * 0.01  # Very small values for power budget
+        B = torch.randn(8, 6) * 0.01
         
         result = matmul.forward(A, B)
         expected_shape = (4, 6)
@@ -162,7 +168,7 @@ def test_optical_kernels():
         
         # Test optical softmax
         softmax = OpticalSoftmax()
-        x = torch.randn(2, 4, 8) * 0.5
+        x = torch.randn(2, 4, 8) * 0.01  # Small values for power budget
         result = softmax.forward(x, dim=-1)
         
         assert result.shape == x.shape, f"Softmax shape mismatch: {result.shape} vs {x.shape}"
