@@ -1,0 +1,20 @@
+{
+  "name": "photonic-flash-attention-global-lb",
+  "type": "application",
+  "regions": [
+    "us-east",
+    "eu-west",
+    "asia-pacific"
+  ],
+  "health_checks": {
+    "enabled": true,
+    "path": "/health",
+    "interval": 30,
+    "timeout": 10
+  },
+  "routing_rules": {
+    "geo_routing": true,
+    "latency_routing": true,
+    "failover": true
+  }
+}

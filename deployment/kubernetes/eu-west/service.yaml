@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: photonic-flash-attention
+    region: eu-west
+  name: photonic-flash-attention-service-eu-west
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: photonic-flash-attention
+    region: eu-west
+  type: LoadBalancer

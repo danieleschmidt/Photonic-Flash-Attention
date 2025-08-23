@@ -1,0 +1,6 @@
+{
+  "consent_management": true,
+  "data_breach_notification": true,
+  "cross_border_transfers": true,
+  "data_protection_officer": true
+}

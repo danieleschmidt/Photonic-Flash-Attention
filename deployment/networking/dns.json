@@ -1,0 +1,15 @@
+{
+  "primary_domain": "terragon.ai",
+  "service_domains": {
+    "api": "api.terragon.ai",
+    "cdn": "cdn.terragon.ai",
+    "monitoring": "monitor.terragon.ai"
+  },
+  "regional_endpoints": {
+    "us-east": "us-east.api.terragon.ai",
+    "eu-west": "eu-west.api.terragon.ai",
+    "asia-pacific": "asia-pacific.api.terragon.ai"
+  },
+  "health_checks": true,
+  "failover_enabled": true
+}
