@@ -1,0 +1,34 @@
+{
+  "regions": [
+    "us-east",
+    "eu-west",
+    "asia-pacific"
+  ],
+  "metrics": {
+    "performance": [
+      "response_time",
+      "throughput",
+      "error_rate"
+    ],
+    "infrastructure": [
+      "cpu_usage",
+      "memory_usage",
+      "disk_usage"
+    ],
+    "business": [
+      "active_users",
+      "requests_per_minute",
+      "conversion_rate"
+    ]
+  },
+  "visualization": {
+    "charts": true,
+    "maps": true,
+    "real_time": true
+  },
+  "alerting": {
+    "global_rules": true,
+    "escalation": true,
+    "suppression": true
+  }
+}

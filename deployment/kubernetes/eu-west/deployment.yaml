@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: photonic-flash-attention
+    region: eu-west
+    version: 1.0.0
+  name: photonic-flash-attention-eu-west
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: photonic-flash-attention
+      region: eu-west
+  template:
+    metadata:
+      labels:
+        app: photonic-flash-attention
+        region: eu-west
+        version: 1.0.0
+    spec:
+      containers:
+      - env:
+        - name: REGION
+          value: eu-west
+        - name: CLOUD_PROVIDER
+          value: gcp
+        - name: COMPLIANCE_REQUIREMENTS
+          value: GDPR,ISO27001
+        - name: SUPPORTED_LANGUAGES
+          value: en,de,fr,es,it
+        image: terragon/photonic-flash-attention:latest
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        name: photonic-flash-attention
+        ports:
+        - containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+      imagePullPolicy: Always

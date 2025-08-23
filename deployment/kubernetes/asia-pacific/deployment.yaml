@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: photonic-flash-attention
+    region: asia-pacific
+    version: 1.0.0
+  name: photonic-flash-attention-asia-pacific
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: photonic-flash-attention
+      region: asia-pacific
+  template:
+    metadata:
+      labels:
+        app: photonic-flash-attention
+        region: asia-pacific
+        version: 1.0.0
+    spec:
+      containers:
+      - env:
+        - name: REGION
+          value: asia-pacific
+        - name: CLOUD_PROVIDER
+          value: azure
+        - name: COMPLIANCE_REQUIREMENTS
+          value: PDPA,APPI
+        - name: SUPPORTED_LANGUAGES
+          value: en,ja,zh,ko
+        image: terragon/photonic-flash-attention:latest
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        name: photonic-flash-attention
+        ports:
+        - containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+      imagePullPolicy: Always

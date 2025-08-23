@@ -1,0 +1,116 @@
+{
+  "start_time": 1755921095.543332,
+  "regions": {
+    "us-east": {
+      "success": true,
+      "region": "us-east",
+      "deployment_method": "kubernetes",
+      "steps": [],
+      "endpoints": [],
+      "deployments": [
+        "deployment/kubernetes/us-east/deployment.yaml-simulated",
+        "deployment/kubernetes/us-east/service.yaml-simulated",
+        "deployment/kubernetes/us-east/hpa.yaml-simulated"
+      ],
+      "services": [
+        "http://us-east.api.terragon.ai",
+        "http://us-east.monitor.terragon.ai"
+      ],
+      "monitoring": {
+        "success": true,
+        "metrics_endpoint": "https://metrics-us-east.terragon.ai",
+        "logs_endpoint": "https://logs-us-east.terragon.ai",
+        "alerts_configured": true
+      },
+      "validation": {
+        "success": true,
+        "health_check": true,
+        "connectivity": true,
+        "compliance": true
+      }
+    },
+    "eu-west": {
+      "success": true,
+      "region": "eu-west",
+      "deployment_method": "kubernetes",
+      "steps": [],
+      "endpoints": [],
+      "deployments": [
+        "deployment/kubernetes/eu-west/deployment.yaml-simulated",
+        "deployment/kubernetes/eu-west/service.yaml-simulated",
+        "deployment/kubernetes/eu-west/hpa.yaml-simulated"
+      ],
+      "services": [
+        "http://eu-west.api.terragon.ai",
+        "http://eu-west.monitor.terragon.ai"
+      ],
+      "monitoring": {
+        "success": true,
+        "metrics_endpoint": "https://metrics-eu-west.terragon.ai",
+        "logs_endpoint": "https://logs-eu-west.terragon.ai",
+        "alerts_configured": true
+      },
+      "validation": {
+        "success": true,
+        "health_check": true,
+        "connectivity": true,
+        "compliance": true
+      }
+    },
+    "asia-pacific": {
+      "success": true,
+      "region": "asia-pacific",
+      "deployment_method": "kubernetes",
+      "steps": [],
+      "endpoints": [],
+      "deployments": [
+        "deployment/kubernetes/asia-pacific/deployment.yaml-simulated",
+        "deployment/kubernetes/asia-pacific/service.yaml-simulated",
+        "deployment/kubernetes/asia-pacific/hpa.yaml-simulated"
+      ],
+      "services": [
+        "http://asia-pacific.api.terragon.ai",
+        "http://asia-pacific.monitor.terragon.ai"
+      ],
+      "monitoring": {
+        "success": true,
+        "metrics_endpoint": "https://metrics-asia-pacific.terragon.ai",
+        "logs_endpoint": "https://logs-asia-pacific.terragon.ai",
+        "alerts_configured": true
+      },
+      "validation": {
+        "success": true,
+        "health_check": true,
+        "connectivity": true,
+        "compliance": true
+      }
+    }
+  },
+  "compliance_status": {
+    "success": true,
+    "gdpr_setup": true,
+    "ccpa_setup": true,
+    "pdpa_setup": true,
+    "encryption_setup": true,
+    "audit_setup": true
+  },
+  "monitoring_status": {
+    "success": true,
+    "global_dashboard": "https://dashboard.terragon.ai",
+    "metrics_aggregation": true,
+    "log_aggregation": true,
+    "alerting": true
+  },
+  "overall_success": true,
+  "deployment_summary": {
+    "successful_regions": 3,
+    "total_regions": 3,
+    "success_rate": 1.0,
+    "deployment_duration": 3.4584028720855713,
+    "compliance_enabled": true,
+    "monitoring_enabled": true,
+    "global_load_balancer": true
+  },
+  "end_time": 1755921099.0017369,
+  "total_duration": 3.458404779434204
+}

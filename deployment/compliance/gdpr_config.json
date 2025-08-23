@@ -1,0 +1,8 @@
+{
+  "data_minimization": true,
+  "consent_management": true,
+  "right_to_be_forgotten": true,
+  "data_portability": true,
+  "privacy_by_design": true,
+  "dpo_contact": "dpo@terragon.ai"
+}

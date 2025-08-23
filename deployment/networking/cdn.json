@@ -1,0 +1,25 @@
+{
+  "provider": "cloudflare",
+  "cache_rules": {
+    "static_assets": {
+      "ttl": 86400
+    },
+    "api_responses": {
+      "ttl": 300
+    },
+    "dynamic_content": {
+      "ttl": 0
+    }
+  },
+  "security": {
+    "ddos_protection": true,
+    "waf_enabled": true,
+    "bot_protection": true
+  },
+  "performance": {
+    "compression": true,
+    "minification": true,
+    "http2_enabled": true,
+    "http3_enabled": true
+  }
+}

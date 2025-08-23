@@ -1,0 +1,17 @@
+{
+  "log_level": "INFO",
+  "log_retention_days": 90,
+  "log_format": "JSON",
+  "audit_events": [
+    "user_authentication",
+    "data_access",
+    "data_modification",
+    "system_configuration",
+    "compliance_actions"
+  ],
+  "log_destinations": [
+    "local_storage",
+    "cloud_logging",
+    "security_siem"
+  ]
+}

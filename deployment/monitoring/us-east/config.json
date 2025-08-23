@@ -1,0 +1,43 @@
+{
+  "region": "us-east",
+  "metrics": {
+    "enabled": true,
+    "interval": 30,
+    "retention_days": 30
+  },
+  "logging": {
+    "level": "INFO",
+    "structured": true,
+    "retention_days": 90
+  },
+  "alerting": {
+    "enabled": true,
+    "channels": [
+      "email",
+      "slack",
+      "pagerduty"
+    ],
+    "rules": [
+      {
+        "metric": "cpu_usage",
+        "threshold": 80,
+        "severity": "warning"
+      },
+      {
+        "metric": "memory_usage",
+        "threshold": 85,
+        "severity": "warning"
+      },
+      {
+        "metric": "error_rate",
+        "threshold": 5,
+        "severity": "critical"
+      },
+      {
+        "metric": "response_time",
+        "threshold": 1000,
+        "severity": "warning"
+      }
+    ]
+  }
+}
