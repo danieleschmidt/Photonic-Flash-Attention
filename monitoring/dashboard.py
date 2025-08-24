@@ -371,7 +371,8 @@ class DashboardServer:
             
             def _serve_404(self):
                 """Serve 404 error."""
-                self.send_error(404, 'Not Found')\n            
+                self.send_error(404, 'Not Found')
+            
             def _generate_dashboard_html(self) -> str:
                 \"\"\"Generate dashboard HTML.\"\"\"
                 return '''
