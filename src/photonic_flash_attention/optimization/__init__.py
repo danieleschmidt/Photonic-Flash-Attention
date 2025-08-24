@@ -1,27 +1,28 @@
-"""Performance optimization and scaling for photonic attention."""
+"""
+Performance optimization modules for photonic flash attention.
+
+This package provides comprehensive performance optimization capabilities
+including adaptive optimization, caching, parallelization, and workload analysis.
+"""
 
 from .performance_optimizer import (
-    PerformanceOptimizer,
-    OptimizationConfig,
-    PerformanceProfile,
-    MemoryPool,
-    BatchProcessor,
-    PerformanceCache,
-    AutoTuner,
+    AdaptiveOptimizer,
+    WorkloadProfiler,
+    CacheManager,
+    OptimizationLevel,
+    OptimizationTarget,
+    WorkloadType,
     get_performance_optimizer,
-    optimize_attention_call,
-    get_optimization_stats
+    optimize_function
 )
 
 __all__ = [
-    "PerformanceOptimizer",
-    "OptimizationConfig", 
-    "PerformanceProfile",
-    "MemoryPool",
-    "BatchProcessor",
-    "PerformanceCache",
-    "AutoTuner",
-    "get_performance_optimizer",
-    "optimize_attention_call", 
-    "get_optimization_stats"
+    'AdaptiveOptimizer',
+    'WorkloadProfiler', 
+    'CacheManager',
+    'OptimizationLevel',
+    'OptimizationTarget',
+    'WorkloadType',
+    'get_performance_optimizer',
+    'optimize_function'
 ]

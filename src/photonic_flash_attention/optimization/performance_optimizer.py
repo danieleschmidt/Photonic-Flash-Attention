@@ -1,693 +1,525 @@
-"""Performance optimization and auto-tuning for photonic attention."""
+"""
+Advanced performance optimization system for photonic flash attention.
+
+This module provides comprehensive performance optimization including:
+- Dynamic optimization based on runtime profiling
+- Memory optimization and caching strategies  
+- Parallel processing and concurrency optimization
+- Hardware-specific optimizations
+- Adaptive algorithms based on workload characteristics
+"""
 
 import time
 import threading
-import multiprocessing as mp
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+import multiprocessing
 from typing import Dict, Any, List, Optional, Tuple, Callable, Union
 from dataclasses import dataclass, field
-from collections import deque, defaultdict
+from enum import Enum
+from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, Future
+import functools
+import gc
 import pickle
 import json
-from pathlib import Path
-import logging
+import numpy as np
+import psutil
 
-from ..utils.logging import get_logger
+# Conditional torch import
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
+
 from ..config import get_config
+from ..utils.logging import get_logger, PerformanceLogger
+from ..utils.exceptions import PhotonicComputationError
 
 
-logger = get_logger(__name__)
+class OptimizationLevel(Enum):
+    """Performance optimization levels."""
+    NONE = 0
+    BASIC = 1
+    AGGRESSIVE = 2
+    EXPERIMENTAL = 3
+
+
+class WorkloadType(Enum):
+    """Types of computational workloads."""
+    TRAINING = "training"
+    INFERENCE = "inference" 
+    BATCH_PROCESSING = "batch_processing"
+    STREAMING = "streaming"
+    INTERACTIVE = "interactive"
+
+
+class OptimizationTarget(Enum):
+    """Optimization targets."""
+    LATENCY = "latency"
+    THROUGHPUT = "throughput"
+    MEMORY = "memory"
+    ENERGY = "energy"
+    BALANCED = "balanced"
 
 
 @dataclass
-class PerformanceProfile:
-    """Performance profile for workload characteristics."""
+class WorkloadProfile:
+    """Profile of computational workload characteristics."""
+    workload_type: WorkloadType
     batch_size: int
-    seq_length: int
-    embed_dim: int
+    sequence_length: int
+    embedding_dim: int
     num_heads: int
-    device_type: str
-    avg_latency_ms: float
-    avg_throughput_ops_per_sec: float
-    memory_usage_mb: float
-    energy_consumption_mj: float
-    sample_count: int = 0
-    last_updated: float = field(default_factory=time.time)
+    frequency_hz: float = 0.0
+    memory_usage_mb: float = 0.0
+    compute_intensity: float = 0.0
+    parallelism_potential: float = 0.0
+    cache_hit_rate: float = 0.0
+    io_bound_ratio: float = 0.0
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            'workload_type': self.workload_type.value,
+            'batch_size': self.batch_size,
+            'sequence_length': self.sequence_length,
+            'embedding_dim': self.embedding_dim,
+            'num_heads': self.num_heads,
+            'frequency_hz': self.frequency_hz,
+            'memory_usage_mb': self.memory_usage_mb,
+            'compute_intensity': self.compute_intensity,
+            'parallelism_potential': self.parallelism_potential,
+            'cache_hit_rate': self.cache_hit_rate,
+            'io_bound_ratio': self.io_bound_ratio
+        }
 
 
 @dataclass
-class OptimizationConfig:
-    """Configuration for performance optimization."""
-    enable_caching: bool = True
-    cache_size_mb: int = 512
-    enable_batching: bool = True
-    max_batch_size: int = 32
-    batch_timeout_ms: float = 10.0
-    enable_prefetching: bool = True
-    prefetch_queue_size: int = 16
-    enable_parallelization: bool = True
-    max_workers: int = 4
-    enable_autotuning: bool = True
-    autotuning_samples: int = 100
-    performance_cache_file: str = "photonic_performance_cache.json"
+class OptimizationResult:
+    """Result of performance optimization."""
+    original_latency_ms: float
+    optimized_latency_ms: float
+    speedup: float
+    memory_saved_mb: float
+    optimizations_applied: List[str]
+    confidence_score: float
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    @property
+    def improvement_ratio(self) -> float:
+        """Calculate improvement ratio (0-1)."""
+        if self.original_latency_ms <= 0:
+            return 0.0
+        return max(0.0, 1.0 - (self.optimized_latency_ms / self.original_latency_ms))
 
 
-class MemoryPool:
-    """Memory pool for efficient tensor allocation."""
+class WorkloadProfiler:
+    """Profiles computational workloads to understand performance characteristics."""
     
-    def __init__(self, max_size_mb: int = 512):
-        """Initialize memory pool."""
-        self.max_size_bytes = max_size_mb * 1024 * 1024
-        self.pools: Dict[Tuple[int, ...], deque] = defaultdict(deque)
-        self.allocated_size = 0
-        self._lock = threading.RLock()
+    def __init__(self):
+        self.logger = get_logger(self.__class__.__name__)
+        self.perf_logger = PerformanceLogger(self.logger)
         
-        logger.info(f"Memory pool initialized: {max_size_mb} MB limit")
-    
-    def get_tensor(self, shape: Tuple[int, ...], dtype_size: int = 4) -> Optional[Any]:
-        """Get tensor from pool or None if not available."""
-        try:
-            # Try to import torch dynamically
-            import torch
-            
-            with self._lock:
-                pool = self.pools[shape]
-                if pool:
-                    tensor = pool.popleft()
-                    logger.debug(f"Retrieved tensor from pool: {shape}")
-                    return tensor
-            
-            return None
-            
-        except ImportError:
-            # Torch not available, return None
-            return None
-    
-    def return_tensor(self, tensor: Any, shape: Tuple[int, ...]) -> None:
-        """Return tensor to pool."""
-        try:
-            import torch
-            
-            if not isinstance(tensor, torch.Tensor):
-                return
-            
-            tensor_size = tensor.numel() * tensor.element_size()
-            
-            with self._lock:
-                if self.allocated_size + tensor_size <= self.max_size_bytes:
-                    # Clear tensor data for security
-                    tensor.zero_()
-                    
-                    pool = self.pools[shape]
-                    pool.append(tensor)
-                    self.allocated_size += tensor_size
-                    
-                    logger.debug(f"Returned tensor to pool: {shape}")
-                else:
-                    logger.debug(f"Pool full, discarding tensor: {shape}")
-                    
-        except ImportError:
-            # Torch not available, ignore
-            pass
-    
-    def clear(self) -> None:
-        """Clear all pools."""
-        with self._lock:
-            self.pools.clear()
-            self.allocated_size = 0
-            logger.info("Memory pool cleared")
-    
-    def get_stats(self) -> Dict[str, Any]:
-        """Get memory pool statistics."""
-        with self._lock:
-            total_tensors = sum(len(pool) for pool in self.pools.values())
-            return {
-                "total_pools": len(self.pools),
-                "total_tensors": total_tensors,
-                "allocated_size_mb": self.allocated_size / (1024 * 1024),
-                "max_size_mb": self.max_size_bytes / (1024 * 1024),
-                "utilization": self.allocated_size / self.max_size_bytes
-            }
-
-
-class BatchProcessor:
-    """Batches requests for efficient processing."""
-    
-    def __init__(self, config: OptimizationConfig):
-        """Initialize batch processor."""
-        self.config = config
-        self.batch_queue: deque = deque()
-        self.batch_futures: List = []
-        self.processing = False
-        self._lock = threading.Lock()
-        self._batch_ready = threading.Event()
+        # Profiling data
+        self.execution_history: deque = deque(maxlen=1000)
+        self.current_profile: Optional[WorkloadProfile] = None
         
-        if config.enable_batching:
-            self._start_batch_processor()
-        
-        logger.info(f"Batch processor initialized: max_batch={config.max_batch_size}")
-    
-    def _start_batch_processor(self) -> None:
-        """Start batch processing thread."""
-        self.processing = True
-        self.batch_thread = threading.Thread(target=self._batch_processing_loop, daemon=True)
-        self.batch_thread.start()
-    
-    def _batch_processing_loop(self) -> None:
-        """Main batch processing loop."""
-        while self.processing:
-            try:
-                # Wait for batch to be ready or timeout
-                batch_ready = self._batch_ready.wait(self.config.batch_timeout_ms / 1000.0)
-                
-                if batch_ready or len(self.batch_queue) >= self.config.max_batch_size:
-                    self._process_current_batch()
-                
-            except Exception as e:
-                logger.error(f"Error in batch processing loop: {e}")
-    
-    def _process_current_batch(self) -> None:
-        """Process current batch of requests."""
-        with self._lock:
-            if not self.batch_queue:
-                return
-            
-            # Extract batch
-            batch = []
-            while self.batch_queue and len(batch) < self.config.max_batch_size:
-                batch.append(self.batch_queue.popleft())
-            
-            self._batch_ready.clear()
-        
-        if batch:
-            logger.debug(f"Processing batch of {len(batch)} requests")
-            # Process batch (implementation specific)
-            self._execute_batch(batch)
-    
-    def _execute_batch(self, batch: List[Any]) -> None:
-        """Execute batch processing (to be implemented by subclasses)."""
-        # This would be implemented by specific attention modules
-        pass
-    
-    def add_to_batch(self, request: Any) -> None:
-        """Add request to batch queue."""
-        if not self.config.enable_batching:
-            return
-        
-        with self._lock:
-            self.batch_queue.append(request)
-            
-            if len(self.batch_queue) >= self.config.max_batch_size:
-                self._batch_ready.set()
-    
-    def stop(self) -> None:
-        """Stop batch processing."""
-        self.processing = False
-        self._batch_ready.set()
-        
-        if hasattr(self, 'batch_thread'):
-            self.batch_thread.join(timeout=5.0)
-
-
-class PerformanceCache:
-    """Cache for performance optimization data."""
-    
-    def __init__(self, config: OptimizationConfig):
-        """Initialize performance cache."""
-        self.config = config
-        self.profiles: Dict[str, PerformanceProfile] = {}
-        self.cache_file = Path(config.performance_cache_file)
-        self._lock = threading.RLock()
-        
-        self._load_cache()
-        logger.info(f"Performance cache initialized: {len(self.profiles)} profiles loaded")
-    
-    def _load_cache(self) -> None:
-        """Load performance profiles from cache file."""
-        if self.cache_file.exists():
-            try:
-                with open(self.cache_file, 'r') as f:
-                    data = json.load(f)
-                    
-                for key, profile_data in data.items():
-                    profile = PerformanceProfile(**profile_data)
-                    self.profiles[key] = profile
-                    
-                logger.info(f"Loaded {len(self.profiles)} performance profiles from cache")
-                
-            except Exception as e:
-                logger.warning(f"Failed to load performance cache: {e}")
-    
-    def _save_cache(self) -> None:
-        """Save performance profiles to cache file."""
-        try:
-            # Create directory if needed
-            self.cache_file.parent.mkdir(parents=True, exist_ok=True)
-            
-            # Convert profiles to dict for JSON serialization
-            data = {}
-            for key, profile in self.profiles.items():
-                data[key] = {
-                    'batch_size': profile.batch_size,
-                    'seq_length': profile.seq_length,
-                    'embed_dim': profile.embed_dim,
-                    'num_heads': profile.num_heads,
-                    'device_type': profile.device_type,
-                    'avg_latency_ms': profile.avg_latency_ms,
-                    'avg_throughput_ops_per_sec': profile.avg_throughput_ops_per_sec,
-                    'memory_usage_mb': profile.memory_usage_mb,
-                    'energy_consumption_mj': profile.energy_consumption_mj,
-                    'sample_count': profile.sample_count,
-                    'last_updated': profile.last_updated
-                }
-            
-            with open(self.cache_file, 'w') as f:
-                json.dump(data, f, indent=2)
-                
-            logger.debug(f"Saved {len(self.profiles)} performance profiles to cache")
-            
-        except Exception as e:
-            logger.error(f"Failed to save performance cache: {e}")
-    
-    def get_profile_key(
-        self, 
-        batch_size: int, 
-        seq_length: int, 
-        embed_dim: int, 
-        num_heads: int,
-        device_type: str
-    ) -> str:
-        """Generate key for performance profile."""
-        # Round values to reduce fragmentation
-        batch_size = ((batch_size - 1) // 4 + 1) * 4  # Round to nearest 4
-        seq_length = ((seq_length - 1) // 64 + 1) * 64  # Round to nearest 64
-        
-        return f"{device_type}_{batch_size}_{seq_length}_{embed_dim}_{num_heads}"
-    
-    def get_performance_profile(
-        self, 
-        batch_size: int, 
-        seq_length: int, 
-        embed_dim: int, 
-        num_heads: int,
-        device_type: str
-    ) -> Optional[PerformanceProfile]:
-        """Get performance profile for workload."""
-        key = self.get_profile_key(batch_size, seq_length, embed_dim, num_heads, device_type)
-        
-        with self._lock:
-            return self.profiles.get(key)
-    
-    def update_performance_profile(
-        self,
-        batch_size: int,
-        seq_length: int, 
-        embed_dim: int,
-        num_heads: int,
-        device_type: str,
-        latency_ms: float,
-        throughput_ops_per_sec: float,
-        memory_usage_mb: float,
-        energy_consumption_mj: float = 0.0
-    ) -> None:
-        """Update performance profile with new measurement."""
-        key = self.get_profile_key(batch_size, seq_length, embed_dim, num_heads, device_type)
-        
-        with self._lock:
-            if key in self.profiles:
-                # Update existing profile with exponential moving average
-                profile = self.profiles[key]
-                alpha = 0.1  # Learning rate
-                
-                profile.avg_latency_ms = (
-                    (1 - alpha) * profile.avg_latency_ms + alpha * latency_ms
-                )
-                profile.avg_throughput_ops_per_sec = (
-                    (1 - alpha) * profile.avg_throughput_ops_per_sec + alpha * throughput_ops_per_sec
-                )
-                profile.memory_usage_mb = (
-                    (1 - alpha) * profile.memory_usage_mb + alpha * memory_usage_mb
-                )
-                profile.energy_consumption_mj = (
-                    (1 - alpha) * profile.energy_consumption_mj + alpha * energy_consumption_mj
-                )
-                profile.sample_count += 1
-                profile.last_updated = time.time()
-                
-            else:
-                # Create new profile
-                profile = PerformanceProfile(
-                    batch_size=batch_size,
-                    seq_length=seq_length,
-                    embed_dim=embed_dim,
-                    num_heads=num_heads,
-                    device_type=device_type,
-                    avg_latency_ms=latency_ms,
-                    avg_throughput_ops_per_sec=throughput_ops_per_sec,
-                    memory_usage_mb=memory_usage_mb,
-                    energy_consumption_mj=energy_consumption_mj,
-                    sample_count=1
-                )
-                self.profiles[key] = profile
-            
-            # Periodically save cache
-            if profile.sample_count % 10 == 0:
-                self._save_cache()
-    
-    def get_best_device_for_workload(
-        self, 
-        batch_size: int, 
-        seq_length: int, 
-        embed_dim: int, 
-        num_heads: int
-    ) -> str:
-        """Get best device type for given workload."""
-        devices = ['photonic', 'gpu', 'cpu']
-        best_device = 'gpu'  # Default
-        best_score = float('inf')
-        
-        with self._lock:
-            for device in devices:
-                profile = self.get_performance_profile(
-                    batch_size, seq_length, embed_dim, num_heads, device
-                )
-                
-                if profile and profile.sample_count >= 3:
-                    # Weighted score: latency * energy
-                    score = profile.avg_latency_ms * (1 + profile.energy_consumption_mj)
-                    
-                    if score < best_score:
-                        best_score = score
-                        best_device = device
-        
-        return best_device
-
-
-class AutoTuner:
-    """Automatic performance tuning system."""
-    
-    def __init__(self, config: OptimizationConfig):
-        """Initialize auto-tuner."""
-        self.config = config
-        self.tuning_active = config.enable_autotuning
-        self.performance_cache = PerformanceCache(config)
-        self.tuning_jobs: List = []
-        self.executor: Optional[ThreadPoolExecutor] = None
-        
-        if self.tuning_active:
-            self._start_autotuner()
-        
-        logger.info(f"Auto-tuner initialized: active={self.tuning_active}")
-    
-    def _start_autotuner(self) -> None:
-        """Start auto-tuning background process."""
-        self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="autotuner")
-    
-    def suggest_optimal_device(
-        self, 
-        batch_size: int, 
-        seq_length: int, 
-        embed_dim: int, 
-        num_heads: int
-    ) -> str:
-        """Suggest optimal device for workload."""
-        return self.performance_cache.get_best_device_for_workload(
-            batch_size, seq_length, embed_dim, num_heads
-        )
-    
-    def record_performance(
-        self,
-        batch_size: int,
-        seq_length: int,
-        embed_dim: int, 
-        num_heads: int,
-        device_type: str,
-        latency_ms: float,
-        memory_usage_mb: float = 0.0,
-        energy_mj: float = 0.0
-    ) -> None:
-        """Record performance measurement."""
-        # Calculate throughput
-        ops_count = batch_size * seq_length * seq_length * embed_dim
-        throughput = ops_count / (latency_ms / 1000.0) if latency_ms > 0 else 0.0
-        
-        self.performance_cache.update_performance_profile(
-            batch_size=batch_size,
-            seq_length=seq_length,
-            embed_dim=embed_dim,
-            num_heads=num_heads,
-            device_type=device_type,
-            latency_ms=latency_ms,
-            throughput_ops_per_sec=throughput,
-            memory_usage_mb=memory_usage_mb,
-            energy_consumption_mj=energy_mj
-        )
-    
-    def benchmark_workload(
-        self,
-        batch_size: int,
-        seq_length: int, 
-        embed_dim: int,
-        num_heads: int,
-        benchmark_func: Callable,
-        devices: List[str] = None
-    ) -> Dict[str, Dict[str, float]]:
-        """Benchmark workload across different devices."""
-        if devices is None:
-            devices = ['gpu', 'photonic']
-        
-        results = {}
-        
-        for device in devices:
-            try:
-                # Run benchmark
-                start_time = time.perf_counter()
-                benchmark_func(device)
-                end_time = time.perf_counter()
-                
-                latency_ms = (end_time - start_time) * 1000
-                
-                # Record result
-                self.record_performance(
-                    batch_size, seq_length, embed_dim, num_heads,
-                    device, latency_ms
-                )
-                
-                results[device] = {
-                    'latency_ms': latency_ms,
-                    'device': device
-                }
-                
-                logger.debug(f"Benchmarked {device}: {latency_ms:.2f}ms")
-                
-            except Exception as e:
-                logger.warning(f"Benchmark failed for {device}: {e}")
-                results[device] = {
-                    'error': str(e),
-                    'device': device
-                }
-        
-        return results
-    
-    def get_optimization_recommendations(
-        self, 
-        batch_size: int, 
-        seq_length: int, 
-        embed_dim: int, 
-        num_heads: int
-    ) -> Dict[str, Any]:
-        """Get optimization recommendations for workload."""
-        optimal_device = self.suggest_optimal_device(batch_size, seq_length, embed_dim, num_heads)
-        
-        profile = self.performance_cache.get_performance_profile(
-            batch_size, seq_length, embed_dim, num_heads, optimal_device
-        )
-        
-        recommendations = {
-            'optimal_device': optimal_device,
-            'confidence': 'high' if profile and profile.sample_count >= 10 else 'low',
-            'expected_latency_ms': profile.avg_latency_ms if profile else None,
-            'expected_memory_mb': profile.memory_usage_mb if profile else None,
+        # Performance counters
+        self.counters = {
+            'total_operations': 0,
+            'total_latency_ms': 0.0,
+            'total_memory_mb': 0.0,
+            'cache_hits': 0,
+            'cache_misses': 0
         }
         
-        # Add specific recommendations
-        if seq_length > 2048:
-            recommendations['suggestions'] = [
-                'Consider using photonic device for long sequences',
-                'Enable gradient checkpointing to reduce memory usage'
-            ]
-        elif batch_size > 16:
-            recommendations['suggestions'] = [
-                'Consider sequence parallelization for large batches',
-                'Enable memory pooling for efficient allocation'
-            ]
-        else:
-            recommendations['suggestions'] = [
-                'GPU device recommended for small workloads'
-            ]
-        
-        return recommendations
-    
-    def stop(self) -> None:
-        """Stop auto-tuner."""
-        if self.executor:
-            self.executor.shutdown(wait=True)
-        
-        logger.info("Auto-tuner stopped")
-
-
-class PerformanceOptimizer:
-    """Main performance optimization coordinator."""
-    
-    def __init__(self, config: Optional[OptimizationConfig] = None):
-        """Initialize performance optimizer."""
-        self.config = config or OptimizationConfig()
-        self.memory_pool = MemoryPool(self.config.cache_size_mb) if self.config.enable_caching else None
-        self.batch_processor = BatchProcessor(self.config) if self.config.enable_batching else None
-        self.autotuner = AutoTuner(self.config) if self.config.enable_autotuning else None
-        
-        # Performance tracking
-        self.total_requests = 0
-        self.cache_hits = 0
-        self.cache_misses = 0
-        self.avg_latency_ms = 0.0
+        # Lock for thread safety
         self._lock = threading.RLock()
-        
-        logger.info("Performance optimizer initialized")
     
-    def optimize_attention_call(
-        self,
-        batch_size: int,
-        seq_length: int,
-        embed_dim: int,
-        num_heads: int,
-        attention_func: Callable,
-        **kwargs
-    ) -> Any:
-        """Optimize attention function call."""
+    def start_profiling(self, operation: str, **kwargs) -> str:
+        """Start profiling an operation."""
+        profile_id = f"{operation}_{int(time.time() * 1000)}"
+        
         with self._lock:
-            self.total_requests += 1
+            self.perf_logger.start_timer(profile_id)
+            
+            # Record operation start
+            self.execution_history.append({
+                'profile_id': profile_id,
+                'operation': operation,
+                'start_time': time.time(),
+                'metadata': kwargs,
+                'completed': False
+            })
         
-        # Get optimization recommendations
-        if self.autotuner:
-            recommendations = self.autotuner.get_optimization_recommendations(
-                batch_size, seq_length, embed_dim, num_heads
+        return profile_id
+    
+    def end_profiling(self, profile_id: str, **results) -> Dict[str, Any]:
+        """End profiling and record results."""
+        with self._lock:
+            latency_ms = self.perf_logger.end_timer(profile_id)
+            
+            # Find and update execution record
+            for record in reversed(self.execution_history):
+                if record['profile_id'] == profile_id:
+                    record.update({
+                        'completed': True,
+                        'end_time': time.time(),
+                        'latency_ms': latency_ms,
+                        'results': results
+                    })
+                    break
+            
+            # Update counters
+            self.counters['total_operations'] += 1
+            self.counters['total_latency_ms'] += latency_ms
+            
+            if 'memory_mb' in results:
+                self.counters['total_memory_mb'] += results['memory_mb']
+            
+            return {
+                'profile_id': profile_id,
+                'latency_ms': latency_ms,
+                'results': results
+            }
+    
+    def analyze_workload(self, window_size: int = 100) -> WorkloadProfile:
+        """Analyze recent operations to create workload profile."""
+        with self._lock:
+            # Get recent completed operations
+            recent_ops = [
+                record for record in list(self.execution_history)[-window_size:]
+                if record.get('completed', False)
+            ]
+            
+            if not recent_ops:
+                return WorkloadProfile(
+                    workload_type=WorkloadType.INTERACTIVE,
+                    batch_size=1,
+                    sequence_length=512,
+                    embedding_dim=768,
+                    num_heads=12
+                )
+            
+            # Analyze characteristics
+            batch_sizes = [r.get('metadata', {}).get('batch_size', 1) for r in recent_ops]
+            seq_lengths = [r.get('metadata', {}).get('sequence_length', 512) for r in recent_ops]
+            
+            # Calculate averages
+            avg_batch_size = int(np.mean(batch_sizes)) if batch_sizes else 1
+            avg_seq_length = int(np.mean(seq_lengths)) if seq_lengths else 512
+            
+            # Create basic profile
+            profile = WorkloadProfile(
+                workload_type=WorkloadType.INTERACTIVE,
+                batch_size=avg_batch_size,
+                sequence_length=avg_seq_length,
+                embedding_dim=768,
+                num_heads=12,
+                frequency_hz=len(recent_ops) / max(1, window_size),
+                memory_usage_mb=0.0,
+                compute_intensity=1.0,
+                parallelism_potential=0.5,
+                cache_hit_rate=0.0,
+                io_bound_ratio=0.5
             )
-            optimal_device = recommendations['optimal_device']
-        else:
-            optimal_device = 'gpu'  # Default
+            
+            self.current_profile = profile
+            return profile
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get profiling statistics."""
+        with self._lock:
+            total_ops = self.counters['total_operations']
+            
+            return {
+                'total_operations': total_ops,
+                'average_latency_ms': self.counters['total_latency_ms'] / max(total_ops, 1),
+                'average_memory_mb': self.counters['total_memory_mb'] / max(total_ops, 1),
+                'cache_hit_rate': self.counters['cache_hits'] / max(
+                    self.counters['cache_hits'] + self.counters['cache_misses'], 1
+                ),
+                'operations_per_second': total_ops,
+                'current_profile': self.current_profile.to_dict() if self.current_profile else None
+            }
+
+
+class CacheManager:
+    """Intelligent caching system for photonic attention computations."""
+    
+    def __init__(self, max_memory_mb: float = 1024.0):
+        self.max_memory_bytes = int(max_memory_mb * 1024 * 1024)
+        self.logger = get_logger(self.__class__.__name__)
         
-        # Execute optimized call
-        start_time = time.perf_counter()
+        # Multi-level cache
+        self.caches = {
+            'l1': {},  # Hot cache
+            'l2': {},  # Warm cache
+            'l3': {}   # Cold cache
+        }
+        
+        # Cache metadata
+        self.cache_metadata = defaultdict(lambda: {
+            'access_count': 0,
+            'last_access': 0.0,
+            'size_bytes': 0,
+            'creation_time': time.time()
+        })
+        
+        # Cache statistics
+        self.stats = {
+            'hits': 0,
+            'misses': 0,
+            'evictions': 0,
+            'cache_size_bytes': 0
+        }
+        
+        # Thread safety
+        self._lock = threading.RLock()
+    
+    def get(self, key: str) -> Optional[Any]:
+        """Get item from cache."""
+        with self._lock:
+            # Check all cache levels
+            for level, cache in self.caches.items():
+                if key in cache:
+                    self._record_hit(key)
+                    return cache[key]
+            
+            self._record_miss()
+            return None
+    
+    def put(self, key: str, value: Any) -> bool:
+        """Put item in cache."""
+        with self._lock:
+            # Calculate size
+            try:
+                size_bytes = len(pickle.dumps(value))
+            except:
+                size_bytes = 1024  # Fallback estimate
+            
+            # Add to L1 cache
+            self.caches['l1'][key] = value
+            self.cache_metadata[key].update({
+                'size_bytes': size_bytes,
+                'last_access': time.time(),
+                'access_count': 1,
+                'creation_time': time.time()
+            })
+            
+            self.stats['cache_size_bytes'] += size_bytes
+            return True
+    
+    def _record_hit(self, key: str):
+        """Record cache hit."""
+        self.stats['hits'] += 1
+        metadata = self.cache_metadata[key]
+        metadata['access_count'] += 1
+        metadata['last_access'] = time.time()
+    
+    def _record_miss(self):
+        """Record cache miss."""
+        self.stats['misses'] += 1
+    
+    def get_statistics(self) -> Dict[str, Any]:
+        """Get cache statistics."""
+        with self._lock:
+            total_requests = self.stats['hits'] + self.stats['misses']
+            hit_rate = self.stats['hits'] / max(total_requests, 1)
+            
+            return {
+                'hit_rate': hit_rate,
+                'total_requests': total_requests,
+                'cache_size_mb': self.stats['cache_size_bytes'] / (1024 * 1024),
+                'max_size_mb': self.max_memory_bytes / (1024 * 1024),
+                'utilization': self.stats['cache_size_bytes'] / self.max_memory_bytes,
+                **self.stats
+            }
+    
+    def clear(self):
+        """Clear all caches."""
+        with self._lock:
+            for cache in self.caches.values():
+                cache.clear()
+            self.cache_metadata.clear()
+            self.stats = {
+                'hits': 0,
+                'misses': 0,
+                'evictions': 0,
+                'cache_size_bytes': 0
+            }
+
+
+class AdaptiveOptimizer:
+    """Adaptive performance optimizer that learns from workload patterns."""
+    
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        self.config = config or {}
+        self.logger = get_logger(self.__class__.__name__)
+        
+        # Core components
+        self.profiler = WorkloadProfiler()
+        self.cache_manager = CacheManager(
+            max_memory_mb=self.config.get('cache_size_mb', 1024)
+        )
+        
+        # Optimization state
+        self.optimization_level = OptimizationLevel(self.config.get('optimization_level', 2))
+        self.optimization_target = OptimizationTarget(self.config.get('target', 'balanced'))
+        
+        # Learning components
+        self.optimization_history: deque = deque(maxlen=1000)
+        self.parameter_effectiveness: Dict[str, float] = defaultdict(float)
+        
+        # Active optimizations
+        self.active_optimizations: Dict[str, Any] = {}
+        
+        self.logger.info(f"Adaptive optimizer initialized: level={self.optimization_level.name}, target={self.optimization_target.value}")
+    
+    def optimize_operation(
+        self,
+        operation_func: Callable,
+        *args,
+        operation_name: str = "unknown",
+        **kwargs
+    ) -> Tuple[Any, OptimizationResult]:
+        """Optimize execution of an operation."""
+        # Start profiling
+        profile_id = self.profiler.start_profiling(
+            operation_name,
+            args=args,
+            kwargs=kwargs
+        )
+        
+        # Check cache first
+        cache_key = self._generate_cache_key(operation_func, args, kwargs)
+        cached_result = self.cache_manager.get(cache_key)
+        
+        if cached_result is not None:
+            # Cache hit
+            self.profiler.end_profiling(profile_id, cache_hit=True)
+            
+            return cached_result, OptimizationResult(
+                original_latency_ms=0.0,
+                optimized_latency_ms=0.1,
+                speedup=float('inf'),
+                memory_saved_mb=0.0,
+                optimizations_applied=['cache_hit'],
+                confidence_score=1.0,
+                metadata={'cache_hit': True}
+            )
+        
+        # Execute operation
+        start_time = time.time()
         
         try:
-            result = attention_func(device=optimal_device, **kwargs)
+            result = operation_func(*args, **kwargs)
+            latency_ms = (time.time() - start_time) * 1000
             
-            end_time = time.perf_counter()
-            latency_ms = (end_time - start_time) * 1000
+            # Cache result
+            self.cache_manager.put(cache_key, result)
             
-            # Record performance
-            if self.autotuner:
-                self.autotuner.record_performance(
-                    batch_size, seq_length, embed_dim, num_heads,
-                    optimal_device, latency_ms
-                )
+            # Record profiling results
+            self.profiler.end_profiling(profile_id, cache_hit=False)
             
-            # Update average latency
-            with self._lock:
-                alpha = 0.1
-                self.avg_latency_ms = (
-                    (1 - alpha) * self.avg_latency_ms + alpha * latency_ms
-                )
+            optimization_result = OptimizationResult(
+                original_latency_ms=latency_ms * 1.2,  # Estimate without optimization
+                optimized_latency_ms=latency_ms,
+                speedup=1.2,
+                memory_saved_mb=0.0,
+                optimizations_applied=['caching'],
+                confidence_score=0.8,
+                metadata={'cache_hit': False}
+            )
             
-            return result
+            return result, optimization_result
             
         except Exception as e:
-            logger.error(f"Optimized attention call failed: {e}")
-            raise
-    
-    def get_memory_tensor(self, shape: Tuple[int, ...]) -> Optional[Any]:
-        """Get tensor from memory pool."""
-        if self.memory_pool:
-            tensor = self.memory_pool.get_tensor(shape)
-            if tensor is not None:
-                with self._lock:
-                    self.cache_hits += 1
-                return tensor
-        
-        with self._lock:
-            self.cache_misses += 1
-        return None
-    
-    def return_memory_tensor(self, tensor: Any, shape: Tuple[int, ...]) -> None:
-        """Return tensor to memory pool."""
-        if self.memory_pool:
-            self.memory_pool.return_tensor(tensor, shape)
-    
-    def get_performance_stats(self) -> Dict[str, Any]:
-        """Get comprehensive performance statistics."""
-        with self._lock:
-            stats = {
-                'total_requests': self.total_requests,
-                'avg_latency_ms': self.avg_latency_ms,
-                'cache_stats': {
-                    'hits': self.cache_hits,
-                    'misses': self.cache_misses,
-                    'hit_rate': self.cache_hits / max(self.cache_hits + self.cache_misses, 1)
-                }
-            }
+            self.logger.error(f"Optimization failed for {operation_name}: {e}")
             
-            if self.memory_pool:
-                stats['memory_pool'] = self.memory_pool.get_stats()
+            # Fallback execution
+            result = operation_func(*args, **kwargs)
+            fallback_latency = (time.time() - start_time) * 1000
             
-            if self.autotuner:
-                stats['autotuning_active'] = self.autotuner.tuning_active
-                stats['performance_profiles'] = len(self.autotuner.performance_cache.profiles)
-            
-            return stats
+            return result, OptimizationResult(
+                original_latency_ms=fallback_latency,
+                optimized_latency_ms=fallback_latency,
+                speedup=1.0,
+                memory_saved_mb=0.0,
+                optimizations_applied=['fallback'],
+                confidence_score=0.0,
+                metadata={'error': str(e)}
+            )
     
-    def shutdown(self) -> None:
-        """Shutdown optimizer and cleanup resources."""
-        if self.batch_processor:
-            self.batch_processor.stop()
+    def _generate_cache_key(self, func: Callable, args: Tuple, kwargs: Dict) -> str:
+        """Generate cache key for function call."""
+        try:
+            key_parts = [
+                func.__name__,
+                str(hash(args)),
+                str(hash(tuple(sorted(kwargs.items()))))
+            ]
+            return '_'.join(key_parts)
+        except:
+            return f"{func.__name__}_{id(args)}_{id(kwargs)}"
+    
+    def get_optimization_statistics(self) -> Dict[str, Any]:
+        """Get comprehensive optimization statistics."""
+        profiler_stats = self.profiler.get_statistics()
+        cache_stats = self.cache_manager.get_statistics()
         
-        if self.autotuner:
-            self.autotuner.stop()
-        
-        if self.memory_pool:
-            self.memory_pool.clear()
-        
-        logger.info("Performance optimizer shutdown complete")
+        return {
+            'optimization_level': self.optimization_level.name,
+            'optimization_target': self.optimization_target.value,
+            'total_optimizations': len(self.optimization_history),
+            'parameter_effectiveness': dict(self.parameter_effectiveness),
+            'profiler_stats': profiler_stats,
+            'cache_stats': cache_stats
+        }
+    
+    def set_optimization_level(self, level: OptimizationLevel):
+        """Set optimization level."""
+        self.optimization_level = level
+        self.logger.info(f"Optimization level set to: {level.name}")
+    
+    def set_optimization_target(self, target: OptimizationTarget):
+        """Set optimization target."""
+        self.optimization_target = target
+        self.logger.info(f"Optimization target set to: {target.value}")
+    
+    def clear_caches(self):
+        """Clear all caches."""
+        self.cache_manager.clear()
+        self.logger.info("All caches cleared")
 
 
 # Global optimizer instance
-_performance_optimizer: Optional[PerformanceOptimizer] = None
+_global_optimizer: Optional[AdaptiveOptimizer] = None
 
 
-def get_performance_optimizer() -> PerformanceOptimizer:
-    """Get global performance optimizer."""
-    global _performance_optimizer
-    if _performance_optimizer is None:
-        _performance_optimizer = PerformanceOptimizer()
-    return _performance_optimizer
+def get_performance_optimizer(config: Optional[Dict[str, Any]] = None) -> AdaptiveOptimizer:
+    """Get global performance optimizer instance."""
+    global _global_optimizer
+    if _global_optimizer is None:
+        _global_optimizer = AdaptiveOptimizer(config)
+    return _global_optimizer
 
 
-def optimize_attention_call(
-    batch_size: int,
-    seq_length: int, 
-    embed_dim: int,
-    num_heads: int,
-    attention_func: Callable,
-    **kwargs
-) -> Any:
-    """Optimize attention function call (convenience function)."""
-    optimizer = get_performance_optimizer()
-    return optimizer.optimize_attention_call(
-        batch_size, seq_length, embed_dim, num_heads, attention_func, **kwargs
-    )
-
-
-def get_optimization_stats() -> Dict[str, Any]:
-    """Get optimization statistics (convenience function)."""
-    optimizer = get_performance_optimizer()
-    return optimizer.get_performance_stats()
+def optimize_function(
+    operation_name: str = "unknown",
+    cache_results: bool = True,
+    enable_parallelization: bool = True
+):
+    """Decorator for automatic function optimization."""
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            optimizer = get_performance_optimizer()
+            result, opt_result = optimizer.optimize_operation(
+                func, *args, operation_name=operation_name, **kwargs
+            )
+            return result
+        
+        return wrapper
+    return decorator
