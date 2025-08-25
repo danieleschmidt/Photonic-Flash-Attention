@@ -3,21 +3,34 @@
 from .logging import get_logger, setup_logging
 from .exceptions import PhotonicHardwareError, PhotonicComputationError
 
-# Import PyTorch-dependent modules conditionally
+# Import PyTorch-dependent modules conditionally with fallbacks
 try:
     from .validation import validate_tensor_shape, validate_attention_inputs
-    from .security import sanitize_input, check_permissions
-    from .monitoring import PerformanceMonitor, HealthMonitor
 except ImportError:
-    # PyTorch not available - provide fallback functions
     def validate_tensor_shape(*args, **kwargs):
         pass
     def validate_attention_inputs(*args, **kwargs):
         pass
-    def sanitize_input(*args, **kwargs):
-        return args[0] if args else None
-    def check_permissions(*args, **kwargs):
-        return True
+
+try:
+    from .security import sanitize_input, check_permissions
+    from .monitoring import PerformanceMonitor, HealthMonitor
+except ImportError:
+    # Fallback to simple implementations
+    from .simple_security import get_security_validator
+    
+    def sanitize_input(data, operation="unknown"):
+        validator = get_security_validator()
+        return validator.validate_input_data(data, operation)
+    
+    def check_permissions(operation, user_context=None):
+        validator = get_security_validator()
+        try:
+            validator.validate_access_permissions(operation, user_context)
+            return True
+        except:
+            return False
+    
     PerformanceMonitor = None
     HealthMonitor = None
 
