@@ -374,7 +374,7 @@ class DashboardServer:
                 self.send_error(404, 'Not Found')
             
             def _generate_dashboard_html(self) -> str:
-                \"\"\"Generate dashboard HTML.\"\"\"
+                """Generate dashboard HTML."""
                 return '''
 <!DOCTYPE html>
 <html lang="en">
@@ -515,7 +515,7 @@ class DashboardServer:
                 '''
             
             def log_message(self, format, *args):
-                \"\"\"Suppress default request logging.\"\"\"
+                """Suppress default request logging."""
                 pass
         
         return DashboardHandler
