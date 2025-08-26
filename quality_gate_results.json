@@ -1,22 +1,22 @@
 {
   "summary": {
     "overall_passed": false,
-    "overall_score": 69.33492975734355,
+    "overall_score": 69.25755857898714,
     "total_gates": 20,
     "passed_gates": 12,
     "failed_gates": 8,
     "category_scores": {
-      "Code Quality": 58.5,
+      "Code Quality": 58.0,
       "Security": 65.0,
       "Performance": 50.0,
-      "Documentation": 88.34291187739463,
+      "Documentation": 88.37868480725622,
       "Architecture": 59.166666666666664,
       "Compliance": 95.0
     },
     "critical_failures": 3,
-    "timestamp": 1756002444.4713476,
+    "timestamp": 1756219766.8807735,
     "recommendations": [
-      "Fix syntax error: /root/repo/monitoring/dashboard.py: unexpected character after line continuation character (dashboard.py, line 374)",
+      "Fix syntax error: /root/repo/monitoring/dashboard.py: unexpected character after line continuation character (dashboard.py, line 518)",
       "/root/repo/quality_gates.py: Relative import outside package",
       "Large file (consider splitting): global_deployment_orchestrator.py: 1353 lines",
       "Large file (consider splitting): adaptive_learning.py: 1024 lines",
@@ -35,19 +35,19 @@
       "score": 90,
       "details": "Found 1 syntax errors",
       "recommendations": [
-        "Fix syntax error: /root/repo/monitoring/dashboard.py: unexpected character after line continuation character (dashboard.py, line 374)"
+        "Fix syntax error: /root/repo/monitoring/dashboard.py: unexpected character after line continuation character (dashboard.py, line 518)"
       ],
-      "timestamp": 1756002444.2180586
+      "timestamp": 1756219766.5964868
     },
     {
       "name": "Import Validation",
       "passed": false,
       "score": 95,
-      "details": "Checked imports in 75 files, found 1 issues",
+      "details": "Checked imports in 78 files, found 1 issues",
       "recommendations": [
         "/root/repo/quality_gates.py: Relative import outside package"
       ],
-      "timestamp": 1756002444.240336
+      "timestamp": 1756219766.622162
     },
     {
       "name": "Code Structure",
@@ -59,13 +59,13 @@
         "Large file (consider splitting): adaptive_learning.py: 1024 lines",
         "Large file (consider splitting): novel_algorithms.py: 1631 lines"
       ],
-      "timestamp": 1756002444.2518294
+      "timestamp": 1756219766.6343946
     },
     {
       "name": "Anti-pattern Check",
       "passed": false,
-      "score": 31,
-      "details": "Found 23 potential anti-patterns",
+      "score": 28,
+      "details": "Found 24 potential anti-patterns",
       "recommendations": [
         "autonomous_sdlc_executor.py: Print statements (use logging instead)",
         "code_quality_check.py: Print statements (use logging instead)",
@@ -73,7 +73,7 @@
         "global_deployment_orchestrator.py: Print statements (use logging instead)",
         "performance_benchmark.py: Print statements (use logging instead)"
       ],
-      "timestamp": 1756002444.260295
+      "timestamp": 1756219766.6428945
     },
     {
       "name": "Hardcoded Secrets Check",
@@ -81,19 +81,19 @@
       "score": 100,
       "details": "Scanned for hardcoded secrets, found 0 potential issues",
       "recommendations": [],
-      "timestamp": 1756002444.3267353
+      "timestamp": 1756219766.719193
     },
     {
       "name": "Insecure Patterns Check",
       "passed": false,
       "score": 0,
-      "details": "Found 11 potentially insecure patterns",
+      "details": "Found 13 potentially insecure patterns",
       "recommendations": [
-        "run_quality_gates.py: Uses eval() - potential code injection risk",
-        "run_quality_gates.py: Uses exec() - potential code injection risk",
-        "test_basic_functionality.py: Uses eval() - potential code injection risk"
+        "quality_gates.py: Uses eval() - potential code injection risk",
+        "quality_gates.py: Uses exec() - potential code injection risk",
+        "run_quality_gates.py: Uses eval() - potential code injection risk"
       ],
-      "timestamp": 1756002444.3360643
+      "timestamp": 1756219766.7290704
     },
     {
       "name": "Dependency Security",
@@ -103,7 +103,7 @@
       "recommendations": [
         "Consider using tools like safety to check for vulnerabilities"
       ],
-      "timestamp": 1756002444.33659
+      "timestamp": 1756219766.7295856
     },
     {
       "name": "Input Validation Check",
@@ -115,19 +115,19 @@
         "conftest.py: May need input validation",
         "test_error_recovery.py: May need input validation"
       ],
-      "timestamp": 1756002444.3526692
+      "timestamp": 1756219766.747009
     },
     {
       "name": "Performance Patterns",
       "passed": false,
       "score": 0,
-      "details": "Performance pattern check complete, 74 issues found",
+      "details": "Performance pattern check complete, 79 issues found",
       "recommendations": [
         "autonomous_sdlc_executor.py: Deeply nested loops (potential performance issue)",
         "code_quality_check.py: Deeply nested loops (potential performance issue)",
         "code_quality_check.py: Potential inefficient string concatenation"
       ],
-      "timestamp": 1756002444.370805
+      "timestamp": 1756219766.7682407
     },
     {
       "name": "Memory Usage Patterns",
@@ -139,27 +139,27 @@
         "quality_gates.py: Global cache may cause memory growth",
         "quality_gates.py: Large range() usage - consider generators"
       ],
-      "timestamp": 1756002444.3829484
+      "timestamp": 1756219766.7812765
     },
     {
       "name": "Algorithmic Complexity",
       "passed": false,
       "score": 70,
-      "details": "Complexity analysis complete, 39 potential issues",
+      "details": "Complexity analysis complete, 41 potential issues",
       "recommendations": [
         "quality_gates.py: Sort operation in loop - consider optimizing",
         "test_photonic_attention.py: Multiple loops in attention code - verify complexity",
         "cli.py: Multiple loops in attention code - verify complexity"
       ],
-      "timestamp": 1756002444.3920853
+      "timestamp": 1756219766.7915835
     },
     {
       "name": "Docstring Coverage",
       "passed": true,
-      "score": 80.02873563218391,
-      "details": "Docstring coverage: 557/696 functions (80.0%)",
+      "score": 80.1360544217687,
+      "details": "Docstring coverage: 589/735 functions (80.1%)",
       "recommendations": [],
-      "timestamp": 1756002444.4093761
+      "timestamp": 1756219766.8120146
     },
     {
       "name": "README Completeness",
@@ -169,7 +169,7 @@
       "recommendations": [
         "Add missing sections: "
       ],
-      "timestamp": 1756002444.4100864
+      "timestamp": 1756219766.8128421
     },
     {
       "name": "API Documentation",
@@ -179,7 +179,7 @@
       "recommendations": [
         "Consider adding more detailed examples in docstrings"
       ],
-      "timestamp": 1756002444.4100947
+      "timestamp": 1756219766.8128536
     },
     {
       "name": "Module Dependencies",
@@ -187,7 +187,7 @@
       "score": 95,
       "details": "Module dependency analysis complete",
       "recommendations": [],
-      "timestamp": 1756002444.417047
+      "timestamp": 1756219766.819752
     },
     {
       "name": "Design Patterns",
@@ -195,31 +195,31 @@
       "score": 90,
       "details": "Design pattern analysis complete - good use of factory, singleton, and adapter patterns",
       "recommendations": [],
-      "timestamp": 1756002444.4170773
+      "timestamp": 1756219766.8197885
     },
     {
       "name": "Scalability Patterns",
       "passed": true,
       "score": 90,
-      "details": "Scalability features found: Concurrency support, Resource pooling, Caching implemented",
+      "details": "Scalability features found: Concurrency support, Caching implemented, Resource pooling",
       "recommendations": [],
-      "timestamp": 1756002444.4382389
+      "timestamp": 1756219766.8432353
     },
     {
       "name": "GDPR Compliance",
       "passed": true,
       "score": 100,
-      "details": "GDPR compliance indicators: GDPR references found, Privacy considerations, Data protection measures",
+      "details": "GDPR compliance indicators: Privacy considerations, Data protection measures, GDPR references found",
       "recommendations": [],
-      "timestamp": 1756002444.4543357
+      "timestamp": 1756219766.8612552
     },
     {
       "name": "International Compliance",
       "passed": true,
       "score": 100,
-      "details": "International compliance features: Internationalization support, Unicode support, Locale support",
+      "details": "International compliance features: Internationalization support, Locale support, Unicode support",
       "recommendations": [],
-      "timestamp": 1756002444.4712756
+      "timestamp": 1756219766.8806918
     },
     {
       "name": "Accessibility Compliance",
@@ -229,7 +229,7 @@
       "recommendations": [
         "Consider accessibility in any future UI components"
       ],
-      "timestamp": 1756002444.4712832
+      "timestamp": 1756219766.8807006
     }
   ]
 }
