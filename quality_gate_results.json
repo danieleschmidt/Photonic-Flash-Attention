@@ -1,7 +1,7 @@
 {
   "summary": {
     "overall_passed": false,
-    "overall_score": 69.25755857898714,
+    "overall_score": 69.2651171579743,
     "total_gates": 20,
     "passed_gates": 12,
     "failed_gates": 8,
@@ -9,14 +9,14 @@
       "Code Quality": 58.0,
       "Security": 65.0,
       "Performance": 50.0,
-      "Documentation": 88.37868480725622,
+      "Documentation": 88.42403628117914,
       "Architecture": 59.166666666666664,
       "Compliance": 95.0
     },
     "critical_failures": 3,
-    "timestamp": 1756219766.8807735,
+    "timestamp": 1756339947.3099,
     "recommendations": [
-      "Fix syntax error: /root/repo/monitoring/dashboard.py: unexpected character after line continuation character (dashboard.py, line 518)",
+      "Fix syntax error: /root/repo/monitoring/dashboard.py: unexpected character after line continuation character (dashboard.py, line 529)",
       "/root/repo/quality_gates.py: Relative import outside package",
       "Large file (consider splitting): global_deployment_orchestrator.py: 1353 lines",
       "Large file (consider splitting): adaptive_learning.py: 1024 lines",
@@ -35,9 +35,9 @@
       "score": 90,
       "details": "Found 1 syntax errors",
       "recommendations": [
-        "Fix syntax error: /root/repo/monitoring/dashboard.py: unexpected character after line continuation character (dashboard.py, line 518)"
+        "Fix syntax error: /root/repo/monitoring/dashboard.py: unexpected character after line continuation character (dashboard.py, line 529)"
       ],
-      "timestamp": 1756219766.5964868
+      "timestamp": 1756339947.0156875
     },
     {
       "name": "Import Validation",
@@ -47,7 +47,7 @@
       "recommendations": [
         "/root/repo/quality_gates.py: Relative import outside package"
       ],
-      "timestamp": 1756219766.622162
+      "timestamp": 1756339947.0420802
     },
     {
       "name": "Code Structure",
@@ -59,7 +59,7 @@
         "Large file (consider splitting): adaptive_learning.py: 1024 lines",
         "Large file (consider splitting): novel_algorithms.py: 1631 lines"
       ],
-      "timestamp": 1756219766.6343946
+      "timestamp": 1756339947.0550117
     },
     {
       "name": "Anti-pattern Check",
@@ -73,7 +73,7 @@
         "global_deployment_orchestrator.py: Print statements (use logging instead)",
         "performance_benchmark.py: Print statements (use logging instead)"
       ],
-      "timestamp": 1756219766.6428945
+      "timestamp": 1756339947.0641727
     },
     {
       "name": "Hardcoded Secrets Check",
@@ -81,7 +81,7 @@
       "score": 100,
       "details": "Scanned for hardcoded secrets, found 0 potential issues",
       "recommendations": [],
-      "timestamp": 1756219766.719193
+      "timestamp": 1756339947.141884
     },
     {
       "name": "Insecure Patterns Check",
@@ -93,7 +93,7 @@
         "quality_gates.py: Uses exec() - potential code injection risk",
         "run_quality_gates.py: Uses eval() - potential code injection risk"
       ],
-      "timestamp": 1756219766.7290704
+      "timestamp": 1756339947.1519516
     },
     {
       "name": "Dependency Security",
@@ -103,7 +103,7 @@
       "recommendations": [
         "Consider using tools like safety to check for vulnerabilities"
       ],
-      "timestamp": 1756219766.7295856
+      "timestamp": 1756339947.1524467
     },
     {
       "name": "Input Validation Check",
@@ -115,7 +115,7 @@
         "conftest.py: May need input validation",
         "test_error_recovery.py: May need input validation"
       ],
-      "timestamp": 1756219766.747009
+      "timestamp": 1756339947.1700597
     },
     {
       "name": "Performance Patterns",
@@ -127,7 +127,7 @@
         "code_quality_check.py: Deeply nested loops (potential performance issue)",
         "code_quality_check.py: Potential inefficient string concatenation"
       ],
-      "timestamp": 1756219766.7682407
+      "timestamp": 1756339947.1918063
     },
     {
       "name": "Memory Usage Patterns",
@@ -139,7 +139,7 @@
         "quality_gates.py: Global cache may cause memory growth",
         "quality_gates.py: Large range() usage - consider generators"
       ],
-      "timestamp": 1756219766.7812765
+      "timestamp": 1756339947.2052593
     },
     {
       "name": "Algorithmic Complexity",
@@ -151,15 +151,15 @@
         "test_photonic_attention.py: Multiple loops in attention code - verify complexity",
         "cli.py: Multiple loops in attention code - verify complexity"
       ],
-      "timestamp": 1756219766.7915835
+      "timestamp": 1756339947.2167664
     },
     {
       "name": "Docstring Coverage",
       "passed": true,
-      "score": 80.1360544217687,
-      "details": "Docstring coverage: 589/735 functions (80.1%)",
+      "score": 80.27210884353741,
+      "details": "Docstring coverage: 590/735 functions (80.3%)",
       "recommendations": [],
-      "timestamp": 1756219766.8120146
+      "timestamp": 1756339947.2373328
     },
     {
       "name": "README Completeness",
@@ -169,7 +169,7 @@
       "recommendations": [
         "Add missing sections: "
       ],
-      "timestamp": 1756219766.8128421
+      "timestamp": 1756339947.238175
     },
     {
       "name": "API Documentation",
@@ -179,7 +179,7 @@
       "recommendations": [
         "Consider adding more detailed examples in docstrings"
       ],
-      "timestamp": 1756219766.8128536
+      "timestamp": 1756339947.2381852
     },
     {
       "name": "Module Dependencies",
@@ -187,7 +187,7 @@
       "score": 95,
       "details": "Module dependency analysis complete",
       "recommendations": [],
-      "timestamp": 1756219766.819752
+      "timestamp": 1756339947.2462642
     },
     {
       "name": "Design Patterns",
@@ -195,15 +195,15 @@
       "score": 90,
       "details": "Design pattern analysis complete - good use of factory, singleton, and adapter patterns",
       "recommendations": [],
-      "timestamp": 1756219766.8197885
+      "timestamp": 1756339947.2463162
     },
     {
       "name": "Scalability Patterns",
       "passed": true,
       "score": 90,
-      "details": "Scalability features found: Concurrency support, Caching implemented, Resource pooling",
+      "details": "Scalability features found: Resource pooling, Concurrency support, Caching implemented",
       "recommendations": [],
-      "timestamp": 1756219766.8432353
+      "timestamp": 1756339947.270826
     },
     {
       "name": "GDPR Compliance",
@@ -211,15 +211,15 @@
       "score": 100,
       "details": "GDPR compliance indicators: Privacy considerations, Data protection measures, GDPR references found",
       "recommendations": [],
-      "timestamp": 1756219766.8612552
+      "timestamp": 1756339947.2897434
     },
     {
       "name": "International Compliance",
       "passed": true,
       "score": 100,
-      "details": "International compliance features: Internationalization support, Locale support, Unicode support",
+      "details": "International compliance features: Unicode support, Locale support, Internationalization support",
       "recommendations": [],
-      "timestamp": 1756219766.8806918
+      "timestamp": 1756339947.3098183
     },
     {
       "name": "Accessibility Compliance",
@@ -229,7 +229,7 @@
       "recommendations": [
         "Consider accessibility in any future UI components"
       ],
-      "timestamp": 1756219766.8807006
+      "timestamp": 1756339947.309831
     }
   ]
 }

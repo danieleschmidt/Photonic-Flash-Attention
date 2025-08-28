@@ -526,7 +526,7 @@ start_time = time.time()
 
 
 def create_monitoring_system():
-    \"\"\"Create and configure the monitoring system.\"\"\"
+    """Create and configure the monitoring system."""
     collector = MetricsCollector()
     dashboard = DashboardServer(collector, port=8080)
     
@@ -534,9 +534,9 @@ def create_monitoring_system():
 
 
 def main():
-    \"\"\"Run standalone monitoring system.\"\"\"
-    print(\"🚀 Starting Photonic Flash Attention Monitoring System\")
-    print(\"=\"*60)
+    """Run standalone monitoring system."""
+    print("🚀 Starting Photonic Flash Attention Monitoring System")
+    print("="*60)
     
     collector, dashboard = create_monitoring_system()
     
@@ -547,23 +547,23 @@ def main():
         # Start dashboard server
         dashboard.start()
         
-        print(\"✅ Monitoring system running\")
-        print(\"   Dashboard: http://localhost:8080\")
-        print(\"   API: http://localhost:8080/api/metrics\")
-        print(\"\\nPress Ctrl+C to stop\")
+        print("✅ Monitoring system running")
+        print("   Dashboard: http://localhost:8080")
+        print("   API: http://localhost:8080/api/metrics")
+        print("\nPress Ctrl+C to stop")
         
         # Keep running
         while True:
             time.sleep(1)
             
     except KeyboardInterrupt:
-        print(\"\\n🛑 Stopping monitoring system...\")
+        print("\n🛑 Stopping monitoring system...")
         
     finally:
         collector.stop_collection()
         dashboard.stop()
-        print(\"✅ Monitoring system stopped\")
+        print("✅ Monitoring system stopped")
 
 
-if __name__ == \"__main__\":
+if __name__ == "__main__":
     main()

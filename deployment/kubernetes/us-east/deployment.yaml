@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: photonic-flash-attention
+    region: us-east
+    version: 1.0.0
+  name: photonic-flash-attention-us-east
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: photonic-flash-attention
+      region: us-east
+  template:
+    metadata:
+      labels:
+        app: photonic-flash-attention
+        region: us-east
+        version: 1.0.0
+    spec:
+      containers:
+      - env:
+        - name: REGION
+          value: us-east
+        - name: CLOUD_PROVIDER
+          value: aws
+        - name: COMPLIANCE_REQUIREMENTS
+          value: CCPA,SOC2
+        - name: SUPPORTED_LANGUAGES
+          value: en,es
+        image: terragon/photonic-flash-attention:latest
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        name: photonic-flash-attention
+        ports:
+        - containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+      imagePullPolicy: Always
